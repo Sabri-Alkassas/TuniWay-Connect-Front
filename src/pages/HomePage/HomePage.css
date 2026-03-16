@@ -1,0 +1,33 @@
+.home-page__title {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+  color: #0f172a;
+}
+
+.home-page__tagline {
+  color: #64748b;
+  font-size: 1.05rem;
+  margin-bottom: 2rem;
+}
+
+.home-page__section {
+  padding: 1.25rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.home-page__section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+  color: #475569;
+}
+
+.home-page__status {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.home-page__status--success {
+  color: #059669;
+}

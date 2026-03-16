@@ -1,0 +1,36 @@
+.example-list {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.example-list h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  color: #334155;
+}
+
+.example-list ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.example-list li {
+  margin-bottom: 0.5rem;
+  color: #475569;
+}
+
+.example-list.loading,
+.example-list.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.example-list.loading {
+  color: #64748b;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
