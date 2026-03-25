@@ -1,12 +1,14 @@
 export interface Station {
   id: string;
   name: string;
-  address: string;
   latitude: number;
   longitude: number;
-  distanceMeters: number;
-  walkMinutes: number;
-  type: 'BUS' | 'METRO' | 'TGM' | 'LOUAGE';
-  isOpen: boolean;
-  lineCount: number;
+  lines: string[];
+  distanceMeters?: number;
+}
+
+export interface NearbyStationsPayload {
+  latitude: number;
+  longitude: number;
+  radiusMeters?: number;
 }

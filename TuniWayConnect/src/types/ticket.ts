@@ -1,15 +1,21 @@
-export type TicketType   = 'SINGLE' | 'RETURN' | 'MONTHLY';
-export type TicketStatus = 'ACTIVE' | 'USED' | 'EXPIRED';
+export type TicketStatus = 'active' | 'used' | 'expired' | 'cancelled';
 
 export interface Ticket {
   id: string;
-  stationName: string;
-  type: TicketType;
+  userId: string;
+  stationFromId: string;
+  stationFromName: string;
+  stationToId: string;
+  stationToName: string;
+  price: number;
   status: TicketStatus;
-  quantity: number;
-  unitPrice: number;
-  totalPaid: number;
-  validUntil: string;
   qrCode: string;
   purchasedAt: string;
+  expiresAt: string;
+  usedAt?: string | null;
+}
+
+export interface BuyTicketPayload {
+  stationFromId: string;
+  stationToId: string;
 }
