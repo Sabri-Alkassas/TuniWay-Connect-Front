@@ -1,0 +1,18 @@
+export const colors = {
+  navy: '#0f2354',
+  navyLight: '#1a3470',
+  amber: '#f5a623',
+  amberDark: '#d4891a',
+  red: '#e8380a',
+  redDark: '#c42e06',
+  white: '#ffffff',
+  offWhite: '#f7f8fc',
+  gray100: '#e8eaf0',
+  gray300: '#b0b5c8',
+  gray500: '#6b7280',
+  gray700: '#374151',
+  black: '#0a0a0a',
+  success: '#1d9e75',
+  danger: '#e8380a',
+  warning: '#f5a623',
+} as const;
