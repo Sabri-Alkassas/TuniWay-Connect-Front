@@ -16,7 +16,7 @@ export function AdminNavigator() {
         headerShown: false,
         tabBarStyle: { backgroundColor: colors.navy },
         tabBarActiveTintColor: colors.amber,
-        tabBarInactiveTintColor: colors.gray300,
+        tabBarInactiveTintColor: colors.gray,
       }}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />

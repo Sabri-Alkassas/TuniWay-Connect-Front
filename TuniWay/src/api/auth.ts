@@ -1,24 +1,15 @@
-import { client } from './client';
-import type { AuthResponse } from '../types/user';
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  firstName: string;
-  lastName: string;
-  username: string;
-  email: string;
-  password: string;
-  dateOfBirth: string;
-  phone?: string | null;
-}
+import { apiClient } from '../lib/apiClient';
+import type {
+  LoginBody,
+  LoginResponseBody,
+  RegisterClientBody,
+  RegisterClientResponseBody,
+} from '../types/auth';
 
 export const authApi = {
-  login: (payload: LoginPayload) =>
-    client.post<AuthResponse>('/auth/login', payload),
-  register: (payload: RegisterPayload) =>
-    client.post<AuthResponse>('/auth/register', payload),
+  login: (body: LoginBody) =>
+    apiClient.post<LoginResponseBody>('/auth/login', body),
+
+  register: (body: RegisterClientBody) =>
+    apiClient.post<RegisterClientResponseBody>('/auth/register-client', body),
 };
