@@ -56,3 +56,25 @@ export type RefreshResponseBody = {
 export type LogoutResponseBody = {
   message?: string;
 };
+
+export type VerifyEmailBody = {
+  email: string;
+  code: string;
+};
+
+export type VerifyEmailResponseBody = {
+  verified: boolean;
+  message?: string;
+};
+
+export type TwoFactorBody = {
+  tempToken: string;
+  totpCode: string;
+};
+
+export type TwoFactorResponseBody = {
+  authenticated: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  message?: string;
+};

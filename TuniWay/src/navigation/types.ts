@@ -1,6 +1,8 @@
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  VerifyEmail: { email: string };
+  TwoFactor: { tempToken: string };
   Tabs: undefined;
 };
 
