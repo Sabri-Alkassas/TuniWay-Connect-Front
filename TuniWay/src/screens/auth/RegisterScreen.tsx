@@ -72,11 +72,7 @@ export function RegisterScreen() {
         birthDate:     formatBirthDate(data.birthDate),
       });
 
-      Alert.alert(
-        'Compte créé',
-        'Votre compte a été créé avec succès. Connectez-vous.',
-        [{ text: 'OK', onPress: () => navigation.replace('Login') }]
-      );
+      navigation.replace('VerifyEmail', { email: data.email });
     } catch (err: any) {
       const message =
         err?.response?.data?.message ?? 'Une erreur est survenue';

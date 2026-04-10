@@ -14,8 +14,8 @@ import { login } from '../../services/authService';
 import { colors } from '../../theme/colors';
 
 const schema = z.object({
-  email:         z.string().email('Email invalide'),
-  password_hash: z.string().min(8, 'Minimum 8 caractères'),
+  email: z.string().email('Email invalide'),
+  password_hash: z.string().min(8, 'Minimum 8 caractÃ¨res'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -35,19 +35,22 @@ export function LoginScreen() {
     try {
       setLoading(true);
       const res = await login({
-        email:         data.email,
+        email: data.email,
         password_hash: data.password_hash,
       });
 
-      if (!res.authenticated) {
-        Alert.alert('Erreur', res.message ?? 'Connexion refusée');
+      if (res.twoFactorRequired) {
+        if (!res.tempToken) {
+          Alert.alert('2FA requis', 'Jeton temporaire manquant pour la vÃ©rification.');
+          return;
+        }
+
+        navigation.replace('TwoFactor', { tempToken: res.tempToken });
         return;
       }
 
-      // handle 2FA if your backend uses it
-      if (res.twoFactorRequired) {
-        // router.push('/two-factor') — wire this up when ready
-        Alert.alert('2FA requis', 'Vérification en deux étapes non encore implémentée.');
+      if (!res.authenticated) {
+        Alert.alert('Erreur', res.message ?? 'Connexion refusÃ©e');
         return;
       }
 
@@ -72,12 +75,10 @@ export function LoginScreen() {
       >
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>Bon retour !</Text>
-          <Text style={styles.heroSub}>Connectez-vous à votre compte</Text>
+          <Text style={styles.heroSub}>Connectez-vous Ã  votre compte</Text>
         </View>
 
         <View style={styles.card}>
-
-          {/* Email */}
           <Text style={styles.label}>Adresse email</Text>
           <Controller
             control={control}
@@ -100,7 +101,6 @@ export function LoginScreen() {
             <Text style={styles.errorMsg}>{errors.email.message}</Text>
           )}
 
-          {/* Password */}
           <Text style={[styles.label, { marginTop: 16 }]}>Mot de passe</Text>
           <Controller
             control={control}
@@ -108,7 +108,7 @@ export function LoginScreen() {
             render={({ field: { onChange, value, onBlur } }) => (
               <TextInput
                 style={[styles.input, errors.password_hash && styles.inputError]}
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 placeholderTextColor={colors.muted}
                 secureTextEntry
                 onChangeText={onChange}
@@ -121,7 +121,6 @@ export function LoginScreen() {
             <Text style={styles.errorMsg}>{errors.password_hash.message}</Text>
           )}
 
-          {/* Submit */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleSubmit(onSubmit)}
@@ -142,7 +141,7 @@ export function LoginScreen() {
 
           <Text style={styles.mutedText}>Pas encore de compte ?</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
-            <Text style={styles.linkText}>Créer un compte</Text>
+            <Text style={styles.linkText}>CrÃ©er un compte</Text>
           </TouchableOpacity>
 
           <Text style={styles.cgu}>
@@ -155,23 +154,23 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:           { flex: 1, backgroundColor: colors.navy },
-  scroll:         { flexGrow: 1 },
-  hero:           { backgroundColor: colors.navy, paddingTop: 70, paddingBottom: 32, alignItems: 'center' },
-  heroTitle:      { fontSize: 26, fontWeight: '800', color: colors.white, marginBottom: 6 },
-  heroSub:        { fontSize: 13, color: colors.muted },
-  card:           { flex: 1, backgroundColor: colors.bgLight, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 24, paddingTop: 28 },
-  label:          { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: 6 },
-  input:          { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, color: colors.navy },
-  inputError:     { borderColor: colors.red },
-  errorMsg:       { fontSize: 11, color: colors.red, marginTop: 4 },
-  button:         { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
+  root: { flex: 1, backgroundColor: colors.navy },
+  scroll: { flexGrow: 1 },
+  hero: { backgroundColor: colors.navy, paddingTop: 70, paddingBottom: 32, alignItems: 'center' },
+  heroTitle: { fontSize: 26, fontWeight: '800', color: colors.white, marginBottom: 6 },
+  heroSub: { fontSize: 13, color: colors.muted },
+  card: { flex: 1, backgroundColor: colors.bgLight, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 24, paddingTop: 28 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: 6 },
+  input: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, color: colors.navy },
+  inputError: { borderColor: colors.red },
+  errorMsg: { fontSize: 11, color: colors.red, marginTop: 4 },
+  button: { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   buttonDisabled: { opacity: 0.7 },
-  buttonText:     { color: colors.white, fontSize: 15, fontWeight: '800' },
-  dividerRow:     { flexDirection: 'row', alignItems: 'center', marginVertical: 22 },
-  dividerLine:    { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerLabel:   { marginHorizontal: 12, color: colors.muted, fontSize: 12 },
-  mutedText:      { textAlign: 'center', color: colors.muted, fontSize: 13 },
-  linkText:       { textAlign: 'center', color: colors.red, fontSize: 14, fontWeight: '800', marginTop: 6 },
-  cgu:            { textAlign: 'center', color: colors.muted, fontSize: 11, marginTop: 24 },
+  buttonText: { color: colors.white, fontSize: 15, fontWeight: '800' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 22 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerLabel: { marginHorizontal: 12, color: colors.muted, fontSize: 12 },
+  mutedText: { textAlign: 'center', color: colors.muted, fontSize: 13 },
+  linkText: { textAlign: 'center', color: colors.red, fontSize: 14, fontWeight: '800', marginTop: 6 },
+  cgu: { textAlign: 'center', color: colors.muted, fontSize: 11, marginTop: 24 },
 });
