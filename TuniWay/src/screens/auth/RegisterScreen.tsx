@@ -46,13 +46,13 @@ export function RegisterScreen() {
     defaultValues: { phone: '' },
   });
 
-  // ✅ Convert DD/MM/YYYY → ISO
+
   const formatBirthDate = (date: string) => {
     const [day, month, year] = date.split('/');
     return `${year}-${month}-${day}T00:00:00Z`;
   };
 
-  // ✅ Ensure +216 prefix
+
   const formatPhone = (phone?: string) => {
     if (!phone) return undefined;
     return phone.startsWith('+216') ? phone : `+216${phone}`;

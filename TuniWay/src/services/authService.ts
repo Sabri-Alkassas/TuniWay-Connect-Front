@@ -19,8 +19,7 @@ export async function login(body: LoginBody): Promise<LoginResponseBody> {
     await setTokens(data.accessToken, data.refreshToken);
   }
 
-  // ← this was missing: update the Zustand store so the app
-  //   knows the user is authenticated immediately
+
   if (data.authenticated && data.accessToken) {
     useAuthStore.getState().setAuth(data.accessToken, {
       id:          data.id ?? '',
