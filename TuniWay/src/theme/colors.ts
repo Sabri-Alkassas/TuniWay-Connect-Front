@@ -9,4 +9,5 @@ export const colors = {
   border:   '#e2eaf8',
   muted:    '#9aaccb',
   success:  '#2bcc6e',
+  green:   '#2bcc6e',
 };

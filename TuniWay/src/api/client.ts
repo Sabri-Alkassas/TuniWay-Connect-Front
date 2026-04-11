@@ -1,11 +1,8 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { useTicketStore } from '../store/ticketStore';
 import { useLocationStore } from '../store/locationStore';
 
-// For Expo Go on a physical phone, use your machine's local IP
-// e.g. http://192.168.1.x:8080/api
-// For emulator use http://10.0.2.2:8080/api
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8080/api';
 
 export const client = axios.create({
@@ -41,7 +38,7 @@ export interface ApiError {
 }
 
 export function parseApiError(error: unknown): ApiError {
-  if (axios.isAxiosError(error)) {
+  if (isAxiosError(error)) {
     return {
       message: error.response?.data?.message ?? error.message,
       status: error.response?.status ?? 0,

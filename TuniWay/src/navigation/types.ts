@@ -25,3 +25,17 @@ export type AdminTabParamList = {
   Stations: undefined;
   AdminScan: undefined;
 };
+
+export type AdminTabParamLista = {
+  AdminDashboard:  undefined;
+  AdminStaff:      undefined;
+  AdminTransports: undefined;
+  AdminPlanning:   undefined;
+  AdminProfile:    undefined;
+};
+ 
+export type AdminStackParamList = {
+
+  AdminTabs: undefined;
+};
+ 
