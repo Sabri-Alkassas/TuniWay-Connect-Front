@@ -38,7 +38,7 @@ export function TwoFactorScreen() {
       });
 
       if (res.authenticated) {
-        navigation.replace('Tabs');
+        return;
       } else {
         setError(res.message ?? 'Code incorrect. Réessayez.');
         setCode('');

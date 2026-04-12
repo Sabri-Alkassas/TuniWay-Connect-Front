@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -8,9 +10,18 @@ export type AuthStackParamList = {
 
 export type UserTabParamList = {
   Home: undefined;
+  Search: undefined;
   Map: undefined;
   Tickets: undefined;
   Profile: undefined;
+};
+
+export type UserStackParamList = {
+  UserTabs: NavigatorScreenParams<UserTabParamList> | undefined;
+  BuyTicket: { transportId: string; transportName: string };
+  TicketConfirm: { ticketId: string };
+  TransportDetail: { transportId: string };
+  EditProfile: undefined;
 };
 
 export type DriverTabParamList = {
@@ -33,9 +44,7 @@ export type AdminTabParamLista = {
   AdminPlanning:   undefined;
   AdminProfile:    undefined;
 };
- 
-export type AdminStackParamList = {
 
+export type AdminStackParamList = {
   AdminTabs: undefined;
 };
- 

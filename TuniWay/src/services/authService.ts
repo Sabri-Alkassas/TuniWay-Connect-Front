@@ -1,6 +1,7 @@
 import { apiClient } from '../lib/apiClient';
 import { clearTokens, setTokens } from '../lib/authStorage';
 import { useAuthStore } from '../store/authStore';
+import type { Role } from '../types/user';
 import type {
   LoginBody,
   LoginResponseBody,
@@ -15,6 +16,18 @@ import type {
   TwoFactorResponseBody,
 } from '../types/auth';
 
+function mapBackendRole(role?: string): Role {
+  switch (role?.toUpperCase()) {
+    case 'ADMIN':
+      return 'admin';
+    case 'EMPLOYEE':
+      return 'driver';
+    case 'CLIENT':
+    default:
+      return 'user';
+  }
+}
+
 /** POST `/auth/login` */
 export async function login(body: LoginBody): Promise<LoginResponseBody> {
   const { data } = await apiClient.post<LoginResponseBody>('/auth/login', body);
@@ -24,10 +37,10 @@ export async function login(body: LoginBody): Promise<LoginResponseBody> {
   }
 
   if (data.authenticated && data.accessToken) {
-    useAuthStore.getState().setAuth(data.accessToken, {
+    await useAuthStore.getState().setAuth(data.accessToken, {
       id: data.id ?? '',
       email: data.email ?? '',
-      role: (data.role as any) ?? 'user',
+      role: mapBackendRole(data.role),
       firstName: '',
       lastName: '',
       username: '',
@@ -57,10 +70,10 @@ export async function verifyTwoFactor(body: TwoFactorBody): Promise<TwoFactorRes
 
   if (data.authenticated && data.accessToken && data.refreshToken) {
     await setTokens(data.accessToken, data.refreshToken);
-    useAuthStore.getState().setAuth(data.accessToken, {
-      id: '',
-      email: '',
-      role: 'admin',
+    await useAuthStore.getState().setAuth(data.accessToken, {
+      id: (data as any).id ?? '',
+      email: (data as any).email ?? '',
+      role: mapBackendRole((data as any).role),
       firstName: '',
       lastName: '',
       username: '',
