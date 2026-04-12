@@ -39,7 +39,7 @@ export function RegisterScreen() {
 
   const [loading, setLoading] = useState(false);
 
-  // ✅ NEW UX STATES
+
   const [showYearModal, setShowYearModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
@@ -154,7 +154,6 @@ export function RegisterScreen() {
           {renderField('username', "Nom d'utilisateur", 'ahmed_b')}
           {renderField('email', 'Adresse email', 'exemple@email.com', { keyboard: 'email-address' })}
 
-          {/* ✅ YEAR → DATE UX */}
           <View style={styles.fieldWrap}>
             <Text style={styles.label}>Date de naissance</Text>
 
