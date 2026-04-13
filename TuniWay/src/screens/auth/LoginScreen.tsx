@@ -10,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
+import { getApiBaseUrl, getApiV1BaseUrl } from '../../config/apiBaseUrl';
 import { login } from '../../services/authService';
 import { colors } from '../../theme/colors';
 
@@ -32,8 +33,14 @@ export function LoginScreen() {
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: FormData) => {
+    const requestBaseUrl = getApiV1BaseUrl();
     try {
       setLoading(true);
+      console.log('[auth] login request', {
+        baseUrl: requestBaseUrl,
+        email: data.email,
+      });
+
       const res = await login({
         email: data.email,
         password_hash: data.password_hash,
@@ -54,10 +61,21 @@ export function LoginScreen() {
         return;
       }
 
-      navigation.replace('Tabs');
+      return;
     } catch (err: any) {
+      console.log('[auth] login error', {
+        baseUrl: requestBaseUrl,
+        message: err?.message,
+        code: err?.code,
+        status: err?.response?.status,
+        responseMessage: err?.response?.data?.message,
+      });
+
       const message =
-        err?.response?.data?.message ?? 'Email ou mot de passe incorrect';
+        err?.response?.data?.message ??
+        (err?.message === 'Network Error'
+          ? `Impossible de joindre le serveur (${getApiBaseUrl()}). Verifiez EXPO_PUBLIC_API_URL et que le telephone est sur le meme reseau.`
+          : 'Email ou mot de passe incorrect');
       Alert.alert('Erreur de connexion', message);
     } finally {
       setLoading(false);
@@ -141,7 +159,7 @@ export function LoginScreen() {
 
           <Text style={styles.mutedText}>Pas encore de compte ?</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
-            <Text style={styles.linkText}>CrÃ©er un compte</Text>
+            <Text style={styles.linkText}>Creer un compte</Text>
           </TouchableOpacity>
 
           <Text style={styles.cgu}>

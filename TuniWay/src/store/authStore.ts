@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeGetItem, safeRemoveItem, safeSetItem } from '../lib/safeStorage';
 import type { User, Role } from '../types/user';
 
 const TOKEN_KEY = 'tuniway_token';
+const USER_KEY = 'tuniway_user';
 
 interface AuthState {
   token: string | null;
@@ -21,19 +22,30 @@ export const useAuthStore = create<AuthState>((set) => ({
   isHydrated: false,
 
   setAuth: async (token, user) => {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+    await safeSetItem(TOKEN_KEY, token);
+    await safeSetItem(USER_KEY, JSON.stringify(user));
     set({ token, user, role: user.role });
   },
 
   clearAuth: async () => {
-    await AsyncStorage.removeItem(TOKEN_KEY);
+    await safeRemoveItem(TOKEN_KEY);
+    await safeRemoveItem(USER_KEY);
     set({ token: null, user: null, role: null });
   },
 
   hydrate: async () => {
     try {
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (token) set({ token });
+      const [token, storedUser] = await Promise.all([
+        safeGetItem(TOKEN_KEY),
+        safeGetItem(USER_KEY),
+      ]);
+
+      if (token && storedUser) {
+        const user = JSON.parse(storedUser) as User;
+        set({ token, user, role: user.role });
+      } else if (token) {
+        set({ token });
+      }
     } catch {
       // fail silently
     } finally {

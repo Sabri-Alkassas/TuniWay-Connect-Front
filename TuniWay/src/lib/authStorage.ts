@@ -1,29 +1,29 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeGetItem, safeMultiRemove, safeRemoveItem, safeSetItem } from './safeStorage';
 
 const KEY_ACCESS = 'tuniway_access_token';
 const KEY_REFRESH = 'tuniway_refresh_token';
 
 export async function getAccessToken(): Promise<string | null> {
-  return AsyncStorage.getItem(KEY_ACCESS);
+  return safeGetItem(KEY_ACCESS);
 }
 
 export async function getRefreshToken(): Promise<string | null> {
-  return AsyncStorage.getItem(KEY_REFRESH);
+  return safeGetItem(KEY_REFRESH);
 }
 
 export async function setTokens(accessToken: string | null, refreshToken: string | null): Promise<void> {
   if (accessToken) {
-    await AsyncStorage.setItem(KEY_ACCESS, accessToken);
+    await safeSetItem(KEY_ACCESS, accessToken);
   } else {
-    await AsyncStorage.removeItem(KEY_ACCESS);
+    await safeRemoveItem(KEY_ACCESS);
   }
   if (refreshToken) {
-    await AsyncStorage.setItem(KEY_REFRESH, refreshToken);
+    await safeSetItem(KEY_REFRESH, refreshToken);
   } else {
-    await AsyncStorage.removeItem(KEY_REFRESH);
+    await safeRemoveItem(KEY_REFRESH);
   }
 }
 
 export async function clearTokens(): Promise<void> {
-  await AsyncStorage.multiRemove([KEY_ACCESS, KEY_REFRESH]);
+  await safeMultiRemove([KEY_ACCESS, KEY_REFRESH]);
 }
