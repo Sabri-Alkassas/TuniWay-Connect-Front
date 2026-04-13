@@ -4,12 +4,13 @@ const memoryStorage = new Map<string, string>();
 let warnedAboutFallback = false;
 
 function warnFallback(error: unknown) {
-  if (warnedAboutFallback) {
-    return;
-  }
+  if (warnedAboutFallback) return;
 
   warnedAboutFallback = true;
-  console.warn('[storage] AsyncStorage unavailable, using in-memory fallback for this session.', error);
+  console.warn(
+    '[storage] AsyncStorage unavailable, using in-memory fallback for this session.',
+    error
+  );
 }
 
 export async function safeGetItem(key: string): Promise<string | null> {
@@ -42,7 +43,12 @@ export async function safeRemoveItem(key: string): Promise<void> {
 
 export async function safeMultiRemove(keys: string[]): Promise<void> {
   try {
-    await AsyncStorage.multiRemove(keys);
+    // ✅ Type-safe workaround
+    const storage = AsyncStorage as unknown as {
+      multiRemove: (keys: string[]) => Promise<void>;
+    };
+
+    await storage.multiRemove(keys);
   } catch (error) {
     warnFallback(error);
   } finally {

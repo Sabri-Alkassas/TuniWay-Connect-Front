@@ -83,6 +83,10 @@ export interface ClientNearbyTransportDto {
   distanceMeters: number;
   nearestStopName: string;
   matchingStopCount: number;
+  markerLatitude?: number;
+  markerLongitude?: number;
+  locationSource?: 'LIVE' | 'STOP';
+  locationUpdatedAt?: string;
 }
 
 export interface ClientTransportDetailsResponse {
@@ -108,6 +112,8 @@ export interface ClientTransportStopDto {
 
 export interface ClientTransportDepartureDto {
   id: string;
+  stopId?: string;
+  stopOrder?: number;
   departureTime: string;
   expectedArrivalTime?: string;
   arrivalTime?: string;

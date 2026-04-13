@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { clientTransportApi, parseApiError } from '../../api/client';
+import { AppIcon } from '../../components/AppIcon';
 import { colors } from '../../theme/colors';
 import type {
   ClientNearbyTransportDto,
@@ -23,6 +24,9 @@ import type { UserStackParamList } from '../../navigation/types';
 type Nav = NativeStackNavigationProp<UserStackParamList>;
 
 const DEFAULT_COORDS = { latitude: 36.8190, longitude: 10.1658 };
+const MAP_REFRESH_MS = 3000;
+const DEFAULT_DELTA = { latitudeDelta: 0.02, longitudeDelta: 0.02 };
+const RELOCATE_DELTA = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
 
 const RADIUS_OPTS = [
   { label: '500m', value: 500 },
@@ -43,6 +47,12 @@ const TYPE_COLOR: Record<string, string> = {
   TRAIN: colors.green,
   METRO: colors.blue,
 };
+
+const TYPE_ICON = {
+  BUS: 'bus',
+  TRAIN: 'train',
+  METRO: 'subway-variant',
+} as const;
 
 function fmtDist(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
@@ -65,9 +75,80 @@ interface DrawerProps {
   date: Date;
   loading: boolean;
   error: string | null;
+  isFollowingRoute: boolean;
   onClose: () => void;
   onBuy: () => void;
   onOpenDate: () => void;
+  onToggleFollowRoute: () => void;
+}
+
+interface CompactRouteBarProps {
+  item: ClientNearbyTransportDto;
+  detail: ClientTransportDetailsResponse | null;
+  stops: ClientTransportStopDto[];
+  isFollowingRoute: boolean;
+  onClose: () => void;
+  onBuy: () => void;
+  onToggleFollowRoute: () => void;
+}
+
+function CompactRouteBar({
+  item,
+  detail,
+  stops,
+  isFollowingRoute,
+  onClose,
+  onBuy,
+  onToggleFollowRoute,
+}: CompactRouteBarProps) {
+  const transport = detail ?? item.transport;
+  const typeColor = TYPE_COLOR[transport.type] ?? colors.muted;
+  const typeIcon = TYPE_ICON[transport.type as keyof typeof TYPE_ICON] ?? 'bus';
+  const firstStop = stops[0]?.name ?? 'Depart';
+  const lastStop = stops[stops.length - 1]?.name ?? 'Arrivee';
+
+  return (
+    <View style={cb.wrap}>
+      <View style={cb.sheet}>
+        <View style={cb.topRow}>
+          <View style={[cb.iconWrap, { backgroundColor: `${typeColor}20` }]}>
+            <AppIcon family="MaterialCommunityIcons" name={typeIcon} size={20} color={typeColor} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={cb.title} numberOfLines={1}>{transport.name}</Text>
+            <Text style={cb.subtitle} numberOfLines={1}>
+              {firstStop} {'->'} {lastStop}
+            </Text>
+          </View>
+          <TouchableOpacity style={cb.iconBtn} onPress={onClose} activeOpacity={0.8}>
+            <AppIcon family="Feather" name="x" size={16} color={colors.muted} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={cb.infoRow}>
+          <View style={cb.infoPill}>
+            <AppIcon family="Feather" name="map" size={12} color={colors.blue} />
+            <Text style={cb.infoTxt}>{stops.length} arrets visibles</Text>
+          </View>
+          <View style={cb.infoPill}>
+            <AppIcon family="Feather" name="navigation" size={12} color={colors.amber} />
+            <Text style={cb.infoTxt}>{isFollowingRoute ? 'Parcours suivi' : 'Parcours pret'}</Text>
+          </View>
+        </View>
+
+        <View style={cb.actions}>
+          <TouchableOpacity style={cb.secondaryBtn} onPress={onToggleFollowRoute} activeOpacity={0.85}>
+            <AppIcon family="Feather" name="maximize-2" size={14} color={colors.navy} />
+            <Text style={cb.secondaryTxt}>Voir les details</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={cb.primaryBtn} onPress={onBuy} activeOpacity={0.85}>
+            <AppIcon family="MaterialCommunityIcons" name="ticket-confirmation-outline" size={16} color={colors.white} />
+            <Text style={cb.primaryTxt}>Acheter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 }
 
 function TransportDrawer({
@@ -78,12 +159,15 @@ function TransportDrawer({
   date,
   loading,
   error,
+  isFollowingRoute,
   onClose,
   onBuy,
   onOpenDate,
+  onToggleFollowRoute,
 }: DrawerProps) {
   const transport = detail ?? item.transport;
   const typeColor = TYPE_COLOR[transport.type] ?? colors.muted;
+  const typeIcon = TYPE_ICON[transport.type as keyof typeof TYPE_ICON] ?? 'bus';
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -93,9 +177,7 @@ function TransportDrawer({
 
         <View style={dr.header}>
           <View style={[dr.typeIcon, { backgroundColor: `${typeColor}22` }]}>
-            <Text style={{ fontSize: 26 }}>
-              {transport.type === 'METRO' ? '🚇' : transport.type === 'TRAIN' ? '🚆' : '🚌'}
-            </Text>
+            <AppIcon family="MaterialCommunityIcons" name={typeIcon} size={28} color={typeColor} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={dr.name} numberOfLines={1}>{transport.name}</Text>
@@ -104,27 +186,40 @@ function TransportDrawer({
                 <Text style={dr.typePillTxt}>{transport.type}</Text>
               </View>
               <Text style={dr.zone}>Zone {transport.zone}</Text>
-              <Text style={dr.dist}>📍 {fmtDist(item.distanceMeters)}</Text>
+              <View style={dr.inlineMeta}>
+                <AppIcon family="Feather" name="map-pin" size={12} color={colors.amber} />
+                <Text style={dr.dist}>{fmtDist(item.distanceMeters)}</Text>
+              </View>
             </View>
           </View>
           <TouchableOpacity style={dr.closeBtn} onPress={onClose}>
-            <Text style={dr.closeTxt}>✕</Text>
+            <AppIcon family="Feather" name="x" size={16} color={colors.muted} />
           </TouchableOpacity>
         </View>
 
-        {!!detail?.description && <Text style={dr.description}>{detail.description}</Text>}
+        {!isFollowingRoute && !!detail?.description && <Text style={dr.description}>{detail.description}</Text>}
+
+        <TouchableOpacity style={dr.followBtn} onPress={onToggleFollowRoute} activeOpacity={0.85}>
+          <AppIcon
+            family="Feather"
+            name="navigation"
+            size={16}
+            color={colors.navy}
+          />
+          <Text style={dr.followBtnTxt}>Suivre son parcours</Text>
+        </TouchableOpacity>
 
         <View style={dr.nearestRow}>
-          <Text style={{ fontSize: 14 }}>📌</Text>
+          <AppIcon family="Feather" name="navigation" size={16} color={colors.red} />
           <View>
-            <Text style={dr.nearestLbl}>Nearest stop</Text>
+            <Text style={dr.nearestLbl}>Arret le plus proche</Text>
             <Text style={dr.nearestName}>{item.nearestStopName}</Text>
           </View>
-          <Text style={dr.stopsCount}>{item.matchingStopCount} stops nearby</Text>
+          <Text style={dr.stopsCount}>{item.matchingStopCount} arrets a proximite</Text>
         </View>
 
         <TouchableOpacity style={dr.datePill} onPress={onOpenDate} activeOpacity={0.8}>
-          <Text style={{ fontSize: 14 }}>📅</Text>
+          <AppIcon family="Feather" name="calendar" size={14} color={colors.navy} />
           <Text style={dr.dateTxt}>{formatDateParam(date)}</Text>
         </TouchableOpacity>
 
@@ -138,7 +233,7 @@ function TransportDrawer({
           <ActivityIndicator color={colors.amber} style={{ marginVertical: 16 }} />
         ) : (
           <>
-            <Text style={dr.sectionTitle}>Route stops</Text>
+            <Text style={dr.sectionTitle}>Arrets du trajet</Text>
             <ScrollView style={{ maxHeight: 140 }} showsVerticalScrollIndicator={false}>
               {stops.map((stop, idx) => (
                 <View key={stop.id} style={dr.stopRow}>
@@ -156,16 +251,16 @@ function TransportDrawer({
               ))}
             </ScrollView>
 
-            <Text style={[dr.sectionTitle, { marginTop: 12 }]}>Departures</Text>
+            <Text style={[dr.sectionTitle, { marginTop: 12 }]}>Departs</Text>
             {departures.length === 0 ? (
-              <Text style={dr.emptyTxt}>No departures for this date</Text>
+              <Text style={dr.emptyTxt}>Aucun depart pour cette date</Text>
             ) : (
               <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
-                {departures.map((departure) => (
-                  <View key={departure.id} style={dr.departureRow}>
+                {departures.map((departure, index) => (
+                  <View key={`${departure.id}-${departure.departureTime}-${index}`} style={dr.departureRow}>
                     <Text style={dr.departureTime}>{departure.departureTime}</Text>
                     <Text style={dr.departureDirection} numberOfLines={1}>
-                      {departure.direction ?? 'Scheduled service'}
+                      {departure.direction ?? 'Service programme'}
                     </Text>
                     <Text style={dr.departureArrival}>
                       {departure.arrivalTime ?? departure.expectedArrivalTime ?? '--:--'}
@@ -178,8 +273,8 @@ function TransportDrawer({
         )}
 
         <TouchableOpacity style={dr.buyBtn} onPress={onBuy} activeOpacity={0.8}>
-          <Text style={{ fontSize: 16 }}>🎟</Text>
-          <Text style={dr.buyBtnTxt}>Buy ticket for this route</Text>
+          <AppIcon family="MaterialCommunityIcons" name="ticket-confirmation-outline" size={18} color={colors.white} />
+          <Text style={dr.buyBtnTxt}>Acheter un billet pour cette ligne</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -187,47 +282,114 @@ function TransportDrawer({
 }
 
 const dr = StyleSheet.create({
-  backdrop:      { flex: 1 },
-  sheet:         { backgroundColor: colors.white, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 34, ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: -4 } }, android: { elevation: 12 } }) },
-  handle:        { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  typeIcon:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  name:          { fontSize: 15, fontWeight: '800', color: colors.navy, marginBottom: 5 },
-  metaRow:       { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  typePill:      { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  typePillTxt:   { fontSize: 10, fontWeight: '800', color: colors.white },
-  zone:          { fontSize: 10, fontWeight: '700', color: colors.muted },
-  dist:          { fontSize: 10, fontWeight: '700', color: colors.amber },
-  closeBtn:      { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  closeTxt:      { fontSize: 13, color: colors.muted, fontWeight: '700' },
-  description:   { fontSize: 11, color: colors.muted, lineHeight: 16, marginBottom: 12 },
-  nearestRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg, borderRadius: 12, padding: 12, marginBottom: 14 },
-  nearestLbl:    { fontSize: 10, fontWeight: '700', color: colors.muted },
-  nearestName:   { fontSize: 13, fontWeight: '700', color: colors.navy },
-  stopsCount:    { marginLeft: 'auto', fontSize: 10, fontWeight: '700', color: colors.blue },
-  datePill:      { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
-  dateTxt:       { fontSize: 12, fontWeight: '700', color: colors.navy },
-  sectionTitle:  { fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 8 },
-  errorBanner:   { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
-  errorTxt:      { fontSize: 11, fontWeight: '700', color: colors.red },
-  stopRow:       { flexDirection: 'row', alignItems: 'flex-start', minHeight: 40 },
-  stopTimeline:  { width: 24, alignItems: 'center', paddingTop: 4 },
-  stopDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.navy, borderWidth: 2, borderColor: colors.white },
-  stopLine:      { flex: 1, width: 2, backgroundColor: colors.border, marginVertical: 2 },
-  stopName:      { flex: 1, fontSize: 12, fontWeight: '700', color: colors.navy, paddingVertical: 4 },
-  stopZone:      { fontSize: 10, color: colors.muted, paddingVertical: 4 },
-  departureRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
+  backdrop: { flex: 1 },
+  sheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 16,
+    paddingBottom: 34,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: -4 },
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  typeIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 15, fontWeight: '800', color: colors.navy, marginBottom: 5 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  inlineMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  typePill: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  typePillTxt: { fontSize: 10, fontWeight: '800', color: colors.white },
+  zone: { fontSize: 10, fontWeight: '700', color: colors.muted },
+  dist: { fontSize: 10, fontWeight: '700', color: colors.amber },
+  closeBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  description: { fontSize: 11, color: colors.muted, lineHeight: 16, marginBottom: 12 },
+  nearestRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg, borderRadius: 12, padding: 12, marginBottom: 14 },
+  nearestLbl: { fontSize: 10, fontWeight: '700', color: colors.muted },
+  nearestName: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  stopsCount: { marginLeft: 'auto', fontSize: 10, fontWeight: '700', color: colors.blue },
+  datePill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
+  dateTxt: { fontSize: 12, fontWeight: '700', color: colors.navy },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: colors.navy, marginBottom: 8 },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
+  errorTxt: { fontSize: 11, fontWeight: '700', color: colors.red },
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.bgLight,
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginBottom: 12,
+  },
+  followBtnTxt: { fontSize: 13, fontWeight: '800', color: colors.navy },
+  stopRow: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 40 },
+  stopTimeline: { width: 24, alignItems: 'center', paddingTop: 4 },
+  stopDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.navy, borderWidth: 2, borderColor: colors.white },
+  stopLine: { flex: 1, width: 2, backgroundColor: colors.border, marginVertical: 2 },
+  stopName: { flex: 1, fontSize: 12, fontWeight: '700', color: colors.navy, paddingVertical: 4 },
+  stopZone: { fontSize: 10, color: colors.muted, paddingVertical: 4 },
+  departureRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
   departureTime: { fontSize: 12, fontWeight: '800', color: colors.navy, width: 54 },
-  departureDirection:{ flex: 1, fontSize: 10, color: colors.navy },
-  departureArrival:{ fontSize: 10, color: colors.muted },
-  emptyTxt:      { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
-  buyBtn:        { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 },
-  buyBtnTxt:     { fontSize: 14, fontWeight: '800', color: colors.white },
+  departureDirection: { flex: 1, fontSize: 10, color: colors.navy },
+  departureArrival: { fontSize: 10, color: colors.muted },
+  emptyTxt: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
+  buyBtn: { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 },
+  buyBtnTxt: { fontSize: 14, fontWeight: '800', color: colors.white },
+});
+
+const cb = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+  },
+  sheet: {
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.16,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+      },
+      android: { elevation: 10 },
+    }),
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 13, fontWeight: '800', color: colors.navy },
+  subtitle: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  iconBtn: { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  infoRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 12 },
+  infoPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.bgLight, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10 },
+  infoTxt: { fontSize: 10, fontWeight: '700', color: colors.navy },
+  actions: { flexDirection: 'row', gap: 8 },
+  secondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.bgLight, borderRadius: 12, paddingVertical: 11, borderWidth: 1.5, borderColor: colors.border },
+  secondaryTxt: { fontSize: 12, fontWeight: '800', color: colors.navy },
+  primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.red, borderRadius: 12, paddingVertical: 11 },
+  primaryTxt: { fontSize: 12, fontWeight: '800', color: colors.white },
 });
 
 export function MapScreen() {
   const navigation = useNavigation<Nav>();
   const mapRef = useRef<MapView>(null);
+  const hasCenteredOnUserRef = useRef(false);
 
   const [userLocation, setUserLocation] = useState(DEFAULT_COORDS);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -246,6 +408,14 @@ export function MapScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [markerCoords, setMarkerCoords] = useState<Record<string, MarkerCoordinate>>({});
+  const [isFollowingRoute, setIsFollowingRoute] = useState(false);
+
+  const focusMap = useCallback((coords: MarkerCoordinate, deltas = DEFAULT_DELTA) => {
+    mapRef.current?.animateToRegion({
+      ...coords,
+      ...deltas,
+    }, 600);
+  }, []);
 
   const initLocation = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -259,8 +429,12 @@ export function MapScreen() {
     return DEFAULT_COORDS;
   }, []);
 
-  const loadNearby = useCallback(async (coords = userLocation, currentRadius = radius) => {
-    setLoading(true);
+  const loadNearby = useCallback(async (
+    coords: MarkerCoordinate,
+    currentRadius: number,
+    options?: { silent?: boolean },
+  ) => {
+    if (!options?.silent) setLoading(true);
     try {
       const res = await clientTransportApi.nearby({
         latitude: coords.latitude,
@@ -277,16 +451,43 @@ export function MapScreen() {
       setNearby([]);
       setError(parseApiError(err).message);
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
-  }, [activeOnly, radius, typeFilter, userLocation]);
+  }, [activeOnly, typeFilter]);
 
   useEffect(() => {
+    let isMounted = true;
+
     (async () => {
       const coords = await initLocation();
+      if (!isMounted) return;
+      focusMap(coords);
+      hasCenteredOnUserRef.current = true;
       await loadNearby(coords, radius);
     })();
-  }, [initLocation, loadNearby, radius]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [focusMap, initLocation, loadNearby, radius]);
+
+  useEffect(() => {
+    if (!locationGranted || hasCenteredOnUserRef.current) return;
+    focusMap(userLocation);
+    hasCenteredOnUserRef.current = true;
+  }, [focusMap, locationGranted, userLocation]);
+
+  useEffect(() => {
+    loadNearby(userLocation, radius);
+  }, [activeOnly, loadNearby, radius, typeFilter, userLocation]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      loadNearby(userLocation, radius, { silent: true });
+    }, MAP_REFRESH_MS);
+
+    return () => clearInterval(intervalId);
+  }, [loadNearby, radius, userLocation]);
 
   useEffect(() => {
     if (nearby.length === 0) {
@@ -294,23 +495,14 @@ export function MapScreen() {
       return;
     }
 
-    (async () => {
-      const entries = await Promise.all(nearby.map(async (item) => {
-        try {
-          const stopsRes = await clientTransportApi.getStops(item.transport.id);
-          const stops = stopsRes.data.data.stops ?? [];
-          const matchedStop = stops.find((stop) => stop.name === item.nearestStopName && stop.latitude && stop.longitude);
-          const fallbackStop = stops.find((stop) => stop.latitude && stop.longitude);
-          const point = matchedStop ?? fallbackStop;
-          if (!point?.latitude || !point?.longitude) return null;
-          return [item.transport.id, { latitude: point.latitude, longitude: point.longitude }] as const;
-        } catch {
-          return null;
-        }
-      }));
+    const entries = nearby
+      .filter((item) => item.markerLatitude != null && item.markerLongitude != null)
+      .map((item) => [
+        item.transport.id,
+        { latitude: item.markerLatitude!, longitude: item.markerLongitude! },
+      ] as const);
 
-      setMarkerCoords(Object.fromEntries(entries.filter(Boolean) as [string, MarkerCoordinate][]));
-    })();
+    setMarkerCoords(Object.fromEntries(entries as [string, MarkerCoordinate][]));
   }, [nearby]);
 
   const loadSelectedTransport = useCallback(async (item: ClientNearbyTransportDto, date: Date) => {
@@ -321,21 +513,10 @@ export function MapScreen() {
         clientTransportApi.getStops(item.transport.id),
         clientTransportApi.getDepartures(item.transport.id, formatDateParam(date)),
       ]);
-      const nextStops = stopsRes.data.data.stops ?? [];
       setSelectedDetail(detailRes.data.data);
-      setSelectedStops(nextStops);
+      setSelectedStops(stopsRes.data.data.stops ?? []);
       setSelectedDepartures(departuresRes.data.data.departures ?? []);
       setSelectedError(null);
-
-      const firstStopWithCoords = nextStops.find((stop) => stop.latitude && stop.longitude);
-      if (firstStopWithCoords?.latitude && firstStopWithCoords?.longitude) {
-        mapRef.current?.animateToRegion({
-          latitude: firstStopWithCoords.latitude,
-          longitude: firstStopWithCoords.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        }, 600);
-      }
     } catch (err) {
       setSelectedDetail(null);
       setSelectedStops([]);
@@ -352,6 +533,7 @@ export function MapScreen() {
       setSelectedStops([]);
       setSelectedDepartures([]);
       setSelectedError(null);
+      setIsFollowingRoute(false);
       return;
     }
 
@@ -366,11 +548,8 @@ export function MapScreen() {
   const relocate = async () => {
     const coords = await initLocation();
     setUserLocation(coords);
-    mapRef.current?.animateToRegion({
-      ...coords,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 600);
+    focusMap(coords, RELOCATE_DELTA);
+    hasCenteredOnUserRef.current = true;
     loadNearby(coords, radius);
   };
 
@@ -388,6 +567,35 @@ export function MapScreen() {
     .filter((stop) => stop.latitude && stop.longitude)
     .map((stop) => ({ latitude: stop.latitude!, longitude: stop.longitude! }));
 
+  const handleToggleFollowRoute = useCallback(() => {
+    if (!isFollowingRoute && routeCoords.length > 1) {
+      mapRef.current?.fitToCoordinates(routeCoords, {
+        edgePadding: { top: 90, right: 70, bottom: 240, left: 70 },
+        animated: true,
+      });
+    } else if (!isFollowingRoute && routeCoords.length === 1) {
+      focusMap(routeCoords[0], { latitudeDelta: 0.015, longitudeDelta: 0.015 });
+    }
+
+    setIsFollowingRoute((value) => !value);
+  }, [focusMap, isFollowingRoute, routeCoords]);
+
+  useEffect(() => {
+    if (!isFollowingRoute) return;
+
+    if (routeCoords.length > 1) {
+      mapRef.current?.fitToCoordinates(routeCoords, {
+        edgePadding: { top: 90, right: 70, bottom: 240, left: 70 },
+        animated: true,
+      });
+      return;
+    }
+
+    if (routeCoords.length === 1) {
+      focusMap(routeCoords[0], { latitudeDelta: 0.015, longitudeDelta: 0.015 });
+    }
+  }, [focusMap, isFollowingRoute, routeCoords]);
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.topbar}>
@@ -399,7 +607,7 @@ export function MapScreen() {
           </View>
         </View>
         <TouchableOpacity style={s.relocateBtn} onPress={relocate} activeOpacity={0.8}>
-          <Text style={{ fontSize: 16 }}>◎</Text>
+          <AppIcon family="Feather" name="crosshair" size={16} color={colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -458,8 +666,7 @@ export function MapScreen() {
           provider={PROVIDER_DEFAULT}
           initialRegion={{
             ...userLocation,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
+            ...DEFAULT_DELTA,
           }}
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
@@ -475,12 +682,16 @@ export function MapScreen() {
           {filtered.map((item) => {
             const coordinate = markerCoords[item.transport.id];
             if (!coordinate) return null;
+
             const isSelected = selected?.transport.id === item.transport.id;
             const typeColor = TYPE_COLOR[item.transport.type] ?? colors.muted;
+            const typeIcon = TYPE_ICON[item.transport.type as keyof typeof TYPE_ICON] ?? 'bus';
+
             return (
               <Marker
                 key={item.transport.id}
                 coordinate={coordinate}
+                anchor={{ x: 0.5, y: 0.5 }}
                 onPress={() => setSelected(item)}
                 title={item.transport.name}
               >
@@ -488,28 +699,32 @@ export function MapScreen() {
                   mk.pin,
                   { borderColor: typeColor, backgroundColor: isSelected ? typeColor : colors.white },
                 ]}>
-                  <Text style={{ fontSize: 16 }}>
-                    {item.transport.type === 'METRO' ? '🚇' : item.transport.type === 'TRAIN' ? '🚆' : '🚌'}
-                  </Text>
+                  <AppIcon
+                    family="MaterialCommunityIcons"
+                    name={typeIcon}
+                    size={18}
+                    color={isSelected ? colors.white : typeColor}
+                  />
                 </View>
               </Marker>
             );
           })}
 
-          {routeCoords.length > 1 && (
+          {isFollowingRoute && routeCoords.length > 1 && (
             <Polyline
               coordinates={routeCoords}
               strokeColor={selected ? (TYPE_COLOR[selected.transport.type] ?? colors.navy) : colors.navy}
-              strokeWidth={3}
+              strokeWidth={4}
             />
           )}
 
-          {selectedStops
+          {isFollowingRoute && selectedStops
             .filter((stop) => stop.latitude && stop.longitude)
             .map((stop, idx) => (
               <Marker
                 key={stop.id}
                 coordinate={{ latitude: stop.latitude!, longitude: stop.longitude! }}
+                anchor={{ x: 0.5, y: 0.5 }}
                 title={stop.name}
               >
                 <View style={[
@@ -522,7 +737,7 @@ export function MapScreen() {
         </MapView>
 
         <View style={s.countBadge}>
-          <Text style={{ fontSize: 10 }}>◎</Text>
+          <AppIcon family="Feather" name="map-pin" size={12} color={colors.white} />
           <Text style={s.countTxt}>{filtered.length} nearby</Text>
         </View>
 
@@ -533,7 +748,7 @@ export function MapScreen() {
         )}
       </View>
 
-      {selected && (
+      {selected && !isFollowingRoute && (
         <TransportDrawer
           item={selected}
           detail={selectedDetail}
@@ -542,7 +757,27 @@ export function MapScreen() {
           date={selectedDate}
           loading={loadingSelected}
           error={selectedError}
+          isFollowingRoute={isFollowingRoute}
           onOpenDate={() => setShowPicker(true)}
+          onToggleFollowRoute={handleToggleFollowRoute}
+          onClose={() => setSelected(null)}
+          onBuy={() => {
+            setSelected(null);
+            navigation.navigate('BuyTicket', {
+              transportId: selected.transport.id,
+              transportName: selected.transport.name,
+            });
+          }}
+        />
+      )}
+
+      {selected && isFollowingRoute && (
+        <CompactRouteBar
+          item={selected}
+          detail={selectedDetail}
+          stops={selectedStops}
+          isFollowingRoute={isFollowingRoute}
+          onToggleFollowRoute={handleToggleFollowRoute}
           onClose={() => setSelected(null)}
           onBuy={() => {
             setSelected(null);
@@ -558,32 +793,32 @@ export function MapScreen() {
 }
 
 const mk = StyleSheet.create({
-  pin:     { width: 44, height: 44, borderRadius: 13, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  pin: { width: 44, height: 44, borderRadius: 13, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
   stopDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.navy, borderWidth: 2.5, borderColor: colors.white },
 });
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.navy },
-  topbar:       { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBadge:    { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: colors.navy },
+  topbar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
   logoBadgeTxt: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  logoText:     { fontSize: 14, fontWeight: '800', color: colors.white },
-  logoAccent:   { color: colors.amber },
-  logoSub:      { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
-  relocateBtn:  { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  filterBar:    { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  filterRow:    { paddingHorizontal: 12, paddingVertical: 9, gap: 6, flexDirection: 'row' },
-  filterDiv:    { width: 1, height: 28, backgroundColor: colors.border, alignSelf: 'center', marginHorizontal: 4 },
-  chip:         { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
-  chipOn:       { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipTxt:      { fontSize: 11, fontWeight: '700', color: colors.navy },
-  chipTxtOn:    { color: colors.white },
-  errorBanner:  { backgroundColor: '#fff1f1', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1b5b5' },
-  errorTxt:     { fontSize: 11, fontWeight: '700', color: colors.red },
-  mapWrap:      { flex: 1, position: 'relative' },
-  map:          { flex: 1 },
-  countBadge:   { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(15,35,84,0.9)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  countTxt:     { fontSize: 11, fontWeight: '800', color: colors.white },
-  mapLoader:    { position: 'absolute', top: 12, right: 12, backgroundColor: colors.navy, borderRadius: 10, padding: 8 },
+  logoText: { fontSize: 14, fontWeight: '800', color: colors.white },
+  logoAccent: { color: colors.amber },
+  logoSub: { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
+  relocateBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  filterBar: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 6, flexDirection: 'row' },
+  filterDiv: { width: 1, height: 28, backgroundColor: colors.border, alignSelf: 'center', marginHorizontal: 4 },
+  chip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
+  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipTxt: { fontSize: 11, fontWeight: '700', color: colors.navy },
+  chipTxtOn: { color: colors.white },
+  errorBanner: { backgroundColor: '#fff1f1', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1b5b5' },
+  errorTxt: { fontSize: 11, fontWeight: '700', color: colors.red },
+  mapWrap: { flex: 1, position: 'relative' },
+  map: { flex: 1 },
+  countBadge: { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(15,35,84,0.9)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  countTxt: { fontSize: 11, fontWeight: '800', color: colors.white },
+  mapLoader: { position: 'absolute', top: 12, right: 12, backgroundColor: colors.navy, borderRadius: 10, padding: 8 },
 });

@@ -8,9 +8,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { clientTicketApi, parseApiError } from '../../api/client';
+import { TicketQrCode } from '../../components/TicketQrCode';
 import { colors } from '../../theme/colors';
 import type { ClientTicketDto } from '../../types/client';
 import type { UserStackParamList } from '../../navigation/types';
+import { AppIcon } from '../../components/AppIcon';
 
 type Nav = NativeStackNavigationProp<UserStackParamList>;
 
@@ -23,7 +25,7 @@ const STATUS_COLOR: Record<string, { bg: string; text: string }> = {
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('fr-TN', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch {
     return iso;
   }
@@ -31,21 +33,24 @@ function fmtDate(iso: string) {
 
 function fmtTime(iso: string) {
   try {
-    return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('fr-TN', { hour: '2-digit', minute: '2-digit' });
   } catch {
     return iso;
   }
 }
 
-interface TicketCardProps { ticket: ClientTicketDto; }
-function TicketCard({ ticket: t }: TicketCardProps) {
+interface TicketCardProps {
+  ticket: ClientTicketDto;
+  onPress: () => void;
+}
+function TicketCard({ ticket: t, onPress }: TicketCardProps) {
   const sc = STATUS_COLOR[t.status] ?? STATUS_COLOR.USED;
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
       <View style={s.cardHeader}>
         <View style={s.cardHeaderLeft}>
           <View style={s.routeIcon}>
-            <Text style={{ fontSize: 18 }}>🎟</Text>
+            <AppIcon family="MaterialCommunityIcons" name="ticket-outline" size={18} color={colors.red} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.routeName} numberOfLines={1}>{t.transportName}</Text>
@@ -53,40 +58,51 @@ function TicketCard({ ticket: t }: TicketCardProps) {
           </View>
         </View>
         <View style={[s.statusBadge, { backgroundColor: sc.bg }]}>
-          <Text style={[s.statusTxt, { color: sc.text }]}>{t.status}</Text>
+          <Text style={[s.statusTxt, { color: sc.text }]}>{t.status === 'VALID' ? 'VALIDE' : t.status}</Text>
         </View>
       </View>
 
       <View style={s.journeyRow}>
         <View style={s.journeyStop}>
-          <Text style={s.journeyStopLabel}>FROM</Text>
+          <Text style={s.journeyStopLabel}>DÉPART</Text>
           <Text style={s.journeyStopName} numberOfLines={1}>{t.fromStop}</Text>
         </View>
         <View style={s.journeyArrow}>
           <View style={s.journeyLine} />
-          <Text style={{ fontSize: 14 }}>→</Text>
+          <AppIcon family="Feather" name="arrow-right" size={14} color={colors.muted} />
           <View style={s.journeyLine} />
         </View>
         <View style={[s.journeyStop, { alignItems: 'flex-end' }]}>
-          <Text style={s.journeyStopLabel}>TO</Text>
+          <Text style={s.journeyStopLabel}>ARRIVÉE</Text>
           <Text style={s.journeyStopName} numberOfLines={1}>{t.toStop}</Text>
         </View>
       </View>
 
+      <View style={s.qrRow}>
+        <TicketQrCode value={t.qrCode ?? t.id} size={54} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.qrTitle}>QR du billet</Text>
+          <Text style={s.qrSub}>Touchez le billet pour afficher le QR complet et le presenter a l&apos;employee.</Text>
+        </View>
+        <View style={s.qrArrow}>
+          <AppIcon family="Feather" name="chevron-right" size={16} color={colors.navy} />
+        </View>
+      </View>
+
       <View style={s.cardFooter}>
-        <Text style={s.footerDate}>{fmtDate(t.purchasedAt)} · {fmtTime(t.plannedDeparture)}</Text>
+        <Text style={s.footerDate}>{fmtDate(t.purchasedAt)} - {fmtTime(t.plannedDeparture)}</Text>
         <Text style={s.footerPrice}>
           {t.price.toFixed(3)} {t.currency}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 const SORT_OPTS = [
-  { key: 'purchasedAt,desc', label: 'Newest first' },
-  { key: 'purchasedAt,asc', label: 'Oldest first' },
-  { key: 'price,desc', label: 'Highest price' },
+  { key: 'purchasedAt,desc', label: 'Plus récents' },
+  { key: 'purchasedAt,asc', label: 'Plus anciens' },
+  { key: 'plannedDeparture, asc', label: 'Expiring soon' },
 ];
 
 export function MyTicketsScreen() {
@@ -139,8 +155,8 @@ export function MyTicketsScreen() {
         <View style={s.logoRow}>
           <View style={s.logoBadge}><Text style={s.logoBadgeTxt}>TW</Text></View>
           <View>
-            <Text style={s.logoText}>My<Text style={s.logoAccent}> Tickets</Text></Text>
-            <Text style={s.logoSub}>TRAVEL HISTORY</Text>
+            <Text style={s.logoText}>Mes<Text style={s.logoAccent}> billets</Text></Text>
+            <Text style={s.logoSub}>HISTORIQUE</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -148,7 +164,7 @@ export function MyTicketsScreen() {
           onPress={() => navigation.navigate('UserTabs', { screen: 'Search' })}
           activeOpacity={0.8}
         >
-          <Text style={s.buyBtnTxt}>+ Buy</Text>
+          <Text style={s.buyBtnTxt}>+ Acheter</Text>
         </TouchableOpacity>
       </View>
 
@@ -196,21 +212,27 @@ export function MyTicketsScreen() {
 
           {tickets.length === 0 ? (
             <View style={s.empty}>
-              <Text style={{ fontSize: 48 }}>🎟</Text>
-              <Text style={s.emptyTxt}>No tickets yet</Text>
+              <AppIcon family="MaterialCommunityIcons" name="ticket-outline" size={48} color={colors.muted} />
+              <Text style={s.emptyTxt}>Aucun billet pour le moment</Text>
               <Text style={s.emptySub}>
-                {error ? 'We could not load your tickets right now.' : 'Buy your first ticket to get started'}
+                {error ? 'Nous n’avons pas pu charger vos billets.' : 'Achetez votre premier billet pour commencer.'}
               </Text>
               <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('UserTabs', { screen: 'Search' })}>
-                <Text style={s.emptyBtnTxt}>{error ? 'Try again' : 'Browse routes'}</Text>
+                <Text style={s.emptyBtnTxt}>{error ? 'Réessayer' : 'Voir les lignes'}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={s.count}>{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</Text>
-              {tickets.map((t) => <TicketCard key={t.id} ticket={t} />)}
+              <Text style={s.count}>{tickets.length} billet{tickets.length !== 1 ? 's' : ''}</Text>
+              {tickets.map((t) => (
+                <TicketCard
+                  key={t.id}
+                  ticket={t}
+                  onPress={() => navigation.navigate('TicketConfirm', { ticketId: t.id })}
+                />
+              ))}
               {loadingMore && <ActivityIndicator color={colors.amber} style={{ marginVertical: 16 }} />}
-              {!hasMore && tickets.length > 0 && <Text style={s.endTxt}>End of history</Text>}
+              {!hasMore && tickets.length > 0 && <Text style={s.endTxt}>Fin de l&apos;historique</Text>}
             </>
           )}
         </ScrollView>
@@ -220,49 +242,53 @@ export function MyTicketsScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.navy },
-  topbar:       { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBadge:    { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: colors.navy },
+  topbar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
   logoBadgeTxt: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  logoText:     { fontSize: 14, fontWeight: '800', color: colors.white },
-  logoAccent:   { color: colors.amber },
-  logoSub:      { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
-  buyBtn:       { backgroundColor: colors.red, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  buyBtnTxt:    { fontSize: 12, fontWeight: '800', color: colors.white },
-  sortWrap:     { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  sortRow:      { paddingHorizontal: 12, paddingVertical: 9, gap: 6, flexDirection: 'row' },
-  sortChip:     { borderRadius: 20, paddingHorizontal: 13, paddingVertical: 6, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
-  sortChipOn:   { backgroundColor: colors.navy, borderColor: colors.navy },
-  sortChipTxt:  { fontSize: 11, fontWeight: '700', color: colors.navy },
-  sortChipTxtOn:{ color: colors.white },
-  body:         { flex: 1, backgroundColor: colors.bg },
-  bodyContent:  { padding: 12, paddingBottom: 24 },
-  centered:     { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  errorBanner:  { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
-  errorText:    { fontSize: 11, fontWeight: '700', color: colors.red },
-  count:        { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
-  card:         { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.border, marginBottom: 10 },
-  cardHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
-  cardHeaderLeft:{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  routeIcon:    { width: 40, height: 40, borderRadius: 11, backgroundColor: colors.redLt, alignItems: 'center', justifyContent: 'center' },
-  routeName:    { fontSize: 13, fontWeight: '700', color: colors.navy },
-  productName:  { fontSize: 10, fontWeight: '700', color: colors.muted, marginTop: 2 },
-  statusBadge:  { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginLeft: 8 },
-  statusTxt:    { fontSize: 10, fontWeight: '700' },
-  journeyRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 12 },
-  journeyStop:  { flex: 1 },
-  journeyStopLabel:{ fontSize: 9, fontWeight: '800', color: colors.muted, letterSpacing: 1 },
+  logoText: { fontSize: 14, fontWeight: '800', color: colors.white },
+  logoAccent: { color: colors.amber },
+  logoSub: { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
+  buyBtn: { backgroundColor: colors.red, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  buyBtnTxt: { fontSize: 12, fontWeight: '800', color: colors.white },
+  sortWrap: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  sortRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 6, flexDirection: 'row' },
+  sortChip: { borderRadius: 20, paddingHorizontal: 13, paddingVertical: 6, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
+  sortChipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  sortChipTxt: { fontSize: 11, fontWeight: '700', color: colors.navy },
+  sortChipTxtOn: { color: colors.white },
+  body: { flex: 1, backgroundColor: colors.bg },
+  bodyContent: { padding: 12, paddingBottom: 24 },
+  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
+  errorText: { fontSize: 11, fontWeight: '700', color: colors.red },
+  count: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
+  card: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.border, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  routeIcon: { width: 40, height: 40, borderRadius: 11, backgroundColor: colors.redLt, alignItems: 'center', justifyContent: 'center' },
+  routeName: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  productName: { fontSize: 10, fontWeight: '700', color: colors.muted, marginTop: 2 },
+  statusBadge: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginLeft: 8 },
+  statusTxt: { fontSize: 10, fontWeight: '700' },
+  journeyRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 12 },
+  journeyStop: { flex: 1 },
+  journeyStopLabel: { fontSize: 9, fontWeight: '800', color: colors.muted, letterSpacing: 1 },
   journeyStopName: { fontSize: 12, fontWeight: '700', color: colors.navy, marginTop: 2 },
   journeyArrow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 },
-  journeyLine:  { flex: 1, height: 1, backgroundColor: colors.border, width: 20 },
-  cardFooter:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg, paddingHorizontal: 13, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
-  footerDate:   { fontSize: 10, color: colors.muted, fontWeight: '600' },
-  footerPrice:  { fontSize: 13, fontWeight: '800', color: colors.red },
-  empty:        { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTxt:     { fontSize: 16, fontWeight: '700', color: colors.navy },
-  emptySub:     { fontSize: 12, color: colors.muted, textAlign: 'center' },
-  emptyBtn:     { marginTop: 8, backgroundColor: colors.navy, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11 },
-  emptyBtnTxt:  { fontSize: 13, fontWeight: '700', color: colors.white },
-  endTxt:       { textAlign: 'center', fontSize: 11, color: colors.muted, marginVertical: 12 },
+  journeyLine: { flex: 1, height: 1, backgroundColor: colors.border, width: 20 },
+  qrRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 13, paddingBottom: 12 },
+  qrTitle: { fontSize: 12, fontWeight: '800', color: colors.navy, marginBottom: 3 },
+  qrSub: { fontSize: 10, color: colors.muted, lineHeight: 14 },
+  qrArrow: { width: 28, height: 28, borderRadius: 9, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bg, paddingHorizontal: 13, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  footerDate: { fontSize: 10, color: colors.muted, fontWeight: '600' },
+  footerPrice: { fontSize: 13, fontWeight: '800', color: colors.red },
+  empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
+  emptyTxt: { fontSize: 16, fontWeight: '700', color: colors.navy },
+  emptySub: { fontSize: 12, color: colors.muted, textAlign: 'center' },
+  emptyBtn: { marginTop: 8, backgroundColor: colors.navy, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11 },
+  emptyBtnTxt: { fontSize: 13, fontWeight: '700', color: colors.white },
+  endTxt: { textAlign: 'center', fontSize: 11, color: colors.muted, marginVertical: 12 },
 });
