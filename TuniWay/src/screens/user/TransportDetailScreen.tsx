@@ -16,6 +16,7 @@ import type {
   ClientTransportDepartureDto,
 } from '../../types/client';
 import type { UserStackParamList } from '../../navigation/types';
+import { AppIcon } from '../../components/AppIcon';
 
 type Nav = NativeStackNavigationProp<UserStackParamList>;
 type Route = { params: { transportId: string } };
@@ -27,10 +28,10 @@ const TYPE_COLOR: Record<string, string> = {
   METRO: colors.blue,
 };
 
-const TYPE_EMOJI: Record<string, string> = {
-  BUS: '🚌',
-  TRAIN: '🚆',
-  METRO: '🚇',
+const TYPE_ICON: Record<string, string> = {
+  BUS: 'bus',
+  TRAIN: 'train',
+  METRO: 'subway-variant',
 };
 
 function formatDateParam(date: Date) {
@@ -46,8 +47,8 @@ function StopsTab({ stops, onBuyPress }: StopsTabProps) {
   if (stops.length === 0) {
     return (
       <View style={sd.empty}>
-        <Text style={{ fontSize: 36 }}>📍</Text>
-        <Text style={sd.emptyTxt}>No stops available</Text>
+        <AppIcon family="Feather" name="map-pin" size={36} color={colors.muted} />
+        <Text style={sd.emptyTxt}>Aucun arrêt disponible</Text>
       </View>
     );
   }
@@ -69,13 +70,13 @@ function StopsTab({ stops, onBuyPress }: StopsTabProps) {
             </View>
             <TouchableOpacity style={sd.content} onPress={onBuyPress} activeOpacity={0.8}>
               <View style={{ flex: 1 }}>
-                <Text style={sd.stopOrder}>Stop {stop.stopOrder}</Text>
+                <Text style={sd.stopOrder}>Arrêt {stop.stopOrder}</Text>
                 <Text style={sd.stopName}>{stop.name}</Text>
                 <Text style={sd.stopZone}>Zone {stop.zone}</Text>
               </View>
               <View style={[sd.statePill, stop.active ? sd.statePillActive : sd.statePillMuted]}>
                 <Text style={[sd.stateText, stop.active ? sd.stateTextActive : sd.stateTextMuted]}>
-                  {stop.active ? 'Buy here' : 'Inactive'}
+                  {stop.active ? 'Disponible' : 'Inactif'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -87,22 +88,22 @@ function StopsTab({ stops, onBuyPress }: StopsTabProps) {
 }
 
 const sd = StyleSheet.create({
-  row:            { flexDirection: 'row', minHeight: 64 },
-  timeline:       { width: 32, alignItems: 'center', paddingTop: 16 },
-  dot:            { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.navy, borderWidth: 2, borderColor: colors.white },
-  connector:      { flex: 1, width: 2, backgroundColor: colors.border, marginVertical: 2 },
-  content:        { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingRight: 4, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 },
-  stopOrder:      { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 2 },
-  stopName:       { fontSize: 13, fontWeight: '700', color: colors.navy },
-  stopZone:       { fontSize: 10, color: colors.muted, marginTop: 2 },
-  statePill:      { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  statePillActive:{ backgroundColor: colors.bgLight },
+  row: { flexDirection: 'row', minHeight: 64 },
+  timeline: { width: 32, alignItems: 'center', paddingTop: 16 },
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.navy, borderWidth: 2, borderColor: colors.white },
+  connector: { flex: 1, width: 2, backgroundColor: colors.border, marginVertical: 2 },
+  content: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingRight: 4, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 },
+  stopOrder: { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 2 },
+  stopName: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  stopZone: { fontSize: 10, color: colors.muted, marginTop: 2 },
+  statePill: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  statePillActive: { backgroundColor: colors.bgLight },
   statePillMuted: { backgroundColor: colors.bgLight },
-  stateText:      { fontSize: 10, fontWeight: '700' },
-  stateTextActive:{ color: colors.red },
+  stateText: { fontSize: 10, fontWeight: '700' },
+  stateTextActive: { color: colors.red },
   stateTextMuted: { color: colors.muted },
-  empty:          { alignItems: 'center', paddingTop: 48, gap: 10 },
-  emptyTxt:       { fontSize: 14, fontWeight: '700', color: colors.muted },
+  empty: { alignItems: 'center', paddingTop: 48, gap: 10 },
+  emptyTxt: { fontSize: 14, fontWeight: '700', color: colors.muted },
 });
 
 interface DeparturesTabProps {
@@ -121,7 +122,7 @@ function DeparturesTab({ date, departures, loading, error, onOpenPicker }: Depar
     <>
       <View style={dd.dateRow}>
         <TouchableOpacity style={dd.datePill} onPress={onOpenPicker} activeOpacity={0.8}>
-          <Text style={dd.dateEmoji}>📅</Text>
+          <AppIcon family="Feather" name="calendar" size={14} color={colors.navy} />
           <Text style={dd.dateTxt}>{todayParam}</Text>
         </TouchableOpacity>
       </View>
@@ -136,11 +137,11 @@ function DeparturesTab({ date, departures, loading, error, onOpenPicker }: Depar
         <ActivityIndicator color={colors.amber} style={{ marginTop: 24 }} />
       ) : departures.length === 0 ? (
         <View style={dd.empty}>
-          <Text style={{ fontSize: 36 }}>🕐</Text>
-          <Text style={dd.emptyTxt}>No departures for this date</Text>
+          <AppIcon family="Feather" name="clock" size={36} color={colors.muted} />
+          <Text style={dd.emptyTxt}>Aucun départ pour cette date</Text>
         </View>
       ) : (
-        departures.map((dep) => {
+        departures.map((dep, index) => {
           const depTime = new Date(`${todayParam}T${dep.departureTime}`);
           const isPast = depTime < now;
           const statusColor =
@@ -149,17 +150,17 @@ function DeparturesTab({ date, departures, loading, error, onOpenPicker }: Depar
             colors.green;
 
           return (
-            <View key={dep.id} style={[dd.row, isPast && dd.rowPast]}>
+            <View key={`${dep.id}-${dep.departureTime}-${index}`} style={[dd.row, isPast && dd.rowPast]}>
               <View style={dd.timeCol}>
                 <Text style={[dd.time, isPast && dd.timePast]}>{dep.departureTime}</Text>
-                <Text style={dd.arrival}>→ {dep.arrivalTime ?? dep.expectedArrivalTime ?? '--:--'}</Text>
+                <Text style={dd.arrival}>Vers {dep.arrivalTime ?? dep.expectedArrivalTime ?? '--:--'}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={dd.direction} numberOfLines={1}>{dep.direction ?? 'Scheduled service'}</Text>
+                <Text style={dd.direction} numberOfLines={1}>{dep.direction ?? 'Service programmé'}</Text>
               </View>
               <View style={[dd.statusBadge, { backgroundColor: `${statusColor}18` }]}>
                 <Text style={[dd.statusTxt, { color: statusColor }]}>
-                  {isPast ? 'Gone' : dep.status ?? 'ON_TIME'}
+                  {isPast ? 'Passé' : dep.status ?? 'ON_TIME'}
                 </Text>
               </View>
             </View>
@@ -171,23 +172,22 @@ function DeparturesTab({ date, departures, loading, error, onOpenPicker }: Depar
 }
 
 const dd = StyleSheet.create({
-  dateRow:      { flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
-  datePill:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: colors.border },
-  dateEmoji:    { fontSize: 14 },
-  dateTxt:      { fontSize: 13, fontWeight: '700', color: colors.navy },
-  errorBanner:  { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
-  errorTxt:     { fontSize: 11, fontWeight: '700', color: colors.red },
-  row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 12, marginBottom: 6, borderWidth: 1.5, borderColor: colors.border, gap: 12 },
-  rowPast:      { opacity: 0.5 },
-  timeCol:      { minWidth: 72 },
-  time:         { fontSize: 16, fontWeight: '800', color: colors.navy },
-  timePast:     { color: colors.muted },
-  arrival:      { fontSize: 10, color: colors.muted, marginTop: 2 },
-  direction:    { fontSize: 11, fontWeight: '700', color: colors.navy },
-  statusBadge:  { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
-  statusTxt:    { fontSize: 10, fontWeight: '700' },
-  empty:        { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyTxt:     { fontSize: 13, fontWeight: '700', color: colors.muted },
+  dateRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
+  datePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: colors.border },
+  dateTxt: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
+  errorTxt: { fontSize: 11, fontWeight: '700', color: colors.red },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 12, marginBottom: 6, borderWidth: 1.5, borderColor: colors.border, gap: 12 },
+  rowPast: { opacity: 0.5 },
+  timeCol: { minWidth: 72 },
+  time: { fontSize: 16, fontWeight: '800', color: colors.navy },
+  timePast: { color: colors.muted },
+  arrival: { fontSize: 10, color: colors.muted, marginTop: 2 },
+  direction: { fontSize: 11, fontWeight: '700', color: colors.navy },
+  statusBadge: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
+  statusTxt: { fontSize: 10, fontWeight: '700' },
+  empty: { alignItems: 'center', paddingTop: 40, gap: 10 },
+  emptyTxt: { fontSize: 13, fontWeight: '700', color: colors.muted },
 });
 
 export function TransportDetailScreen() {
@@ -244,21 +244,20 @@ export function TransportDetailScreen() {
 
   const onDateChange = (event: DateTimePickerEvent, nextDate?: Date) => {
     if (Platform.OS !== 'ios') setShowPicker(false);
-    if (event.type === 'set' && nextDate) {
-      setSelectedDate(nextDate);
-    }
+    if (event.type === 'set' && nextDate) setSelectedDate(nextDate);
   };
 
   const typeColor = detail ? (TYPE_COLOR[detail.type] ?? colors.muted) : colors.muted;
+  const typeIcon = detail ? (TYPE_ICON[detail.type] ?? 'bus') : 'bus';
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.topbar}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={s.backTxt}>‹</Text>
+          <AppIcon family="Feather" name="chevron-left" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={s.topTitle} numberOfLines={1}>
-          {detail?.name ?? 'Route Details'}
+          {detail?.name ?? 'Détail du trajet'}
         </Text>
         <View style={{ width: 34 }} />
       </View>
@@ -267,7 +266,7 @@ export function TransportDetailScreen() {
         <View style={[s.hero, { borderBottomColor: typeColor }]}>
           <View style={s.heroRow}>
             <View style={[s.heroIcon, { backgroundColor: `${typeColor}22` }]}>
-              <Text style={{ fontSize: 28 }}>{TYPE_EMOJI[detail.type] ?? '🚌'}</Text>
+              <AppIcon family="MaterialCommunityIcons" name={typeIcon as never} size={28} color={typeColor} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.heroName}>{detail.name}</Text>
@@ -278,7 +277,7 @@ export function TransportDetailScreen() {
                 <Text style={s.zoneText}>Zone {detail.zone}</Text>
                 <View style={[s.activePill, { backgroundColor: detail.active ? colors.greenLt : colors.bgLight }]}>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: detail.active ? '#27500A' : colors.muted }}>
-                    {detail.active ? 'Active' : 'Inactive'}
+                    {detail.active ? 'Actif' : 'Inactif'}
                   </Text>
                 </View>
               </View>
@@ -297,7 +296,7 @@ export function TransportDetailScreen() {
             activeOpacity={0.8}
           >
             <Text style={[s.tabTxt, tab === value && s.tabTxtOn]}>
-              {value === 'stops' ? 'Stops' : 'Departures'}
+              {value === 'stops' ? 'Arrêts' : 'Départs'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -308,7 +307,7 @@ export function TransportDetailScreen() {
           }}
           activeOpacity={0.8}
         >
-          <Text style={s.buyTabTxt}>Buy Ticket</Text>
+          <Text style={s.buyTabTxt}>Acheter</Text>
         </TouchableOpacity>
       </View>
 
@@ -330,7 +329,7 @@ export function TransportDetailScreen() {
           <View style={s.errorBanner}>
             <Text style={s.errorTxt}>{error}</Text>
             <TouchableOpacity style={s.retryBtn} onPress={loadHeaderAndStops} activeOpacity={0.8}>
-              <Text style={s.retryTxt}>Retry</Text>
+              <Text style={s.retryTxt}>Réessayer</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -364,33 +363,32 @@ export function TransportDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.navy },
-  topbar:       { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  backBtn:      { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  backTxt:      { fontSize: 22, color: colors.white, fontWeight: '700', lineHeight: 26 },
-  topTitle:     { flex: 1, fontSize: 15, fontWeight: '800', color: colors.white, textAlign: 'center' },
-  hero:         { paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: 3 },
-  heroRow:      { flexDirection: 'row', gap: 12 },
-  heroIcon:     { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  heroName:     { fontSize: 15, fontWeight: '800', color: colors.white, marginBottom: 6 },
-  heroMeta:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  typeBadge:    { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  safe: { flex: 1, backgroundColor: colors.navy },
+  topbar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  backBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  topTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.white, textAlign: 'center' },
+  hero: { paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: 3 },
+  heroRow: { flexDirection: 'row', gap: 12 },
+  heroIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  heroName: { fontSize: 15, fontWeight: '800', color: colors.white, marginBottom: 6 },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  typeBadge: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   typeBadgeTxt: { fontSize: 10, fontWeight: '800', color: colors.white },
-  zoneText:     { fontSize: 10, fontWeight: '700', color: colors.muted },
-  activePill:   { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  heroDesc:     { fontSize: 11, color: colors.muted, marginTop: 6 },
-  tabs:         { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabBtn:       { flex: 1, paddingVertical: 11, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabBtnOn:     { borderBottomColor: colors.navy },
-  tabTxt:       { fontSize: 11, fontWeight: '700', color: colors.muted },
-  tabTxtOn:     { color: colors.navy },
-  buyTabBtn:    { flex: 1, paddingVertical: 11, alignItems: 'center', backgroundColor: colors.bgLight, borderBottomWidth: 2, borderBottomColor: colors.red },
-  buyTabTxt:    { fontSize: 11, fontWeight: '700', color: colors.red },
-  body:         { flex: 1, backgroundColor: colors.bgLight },
-  bodyContent:  { padding: 14, paddingBottom: 24 },
-  centered:     { flex: 1, backgroundColor: colors.bgLight, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  errorBanner:  { backgroundColor: colors.redLt, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: '#f1b5b5', gap: 10, width: '100%' },
-  errorTxt:     { fontSize: 12, fontWeight: '700', color: colors.red },
-  retryBtn:     { alignSelf: 'flex-start', backgroundColor: colors.navy, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  retryTxt:     { fontSize: 11, fontWeight: '800', color: colors.white },
+  zoneText: { fontSize: 10, fontWeight: '700', color: colors.muted },
+  activePill: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  heroDesc: { fontSize: 11, color: colors.muted, marginTop: 6 },
+  tabs: { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabBtn: { flex: 1, paddingVertical: 11, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnOn: { borderBottomColor: colors.navy },
+  tabTxt: { fontSize: 11, fontWeight: '700', color: colors.muted },
+  tabTxtOn: { color: colors.navy },
+  buyTabBtn: { flex: 1, paddingVertical: 11, alignItems: 'center', backgroundColor: colors.bgLight, borderBottomWidth: 2, borderBottomColor: colors.red },
+  buyTabTxt: { fontSize: 11, fontWeight: '700', color: colors.red },
+  body: { flex: 1, backgroundColor: colors.bgLight },
+  bodyContent: { padding: 14, paddingBottom: 24 },
+  centered: { flex: 1, backgroundColor: colors.bgLight, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: '#f1b5b5', gap: 10, width: '100%' },
+  errorTxt: { fontSize: 12, fontWeight: '700', color: colors.red },
+  retryBtn: { alignSelf: 'flex-start', backgroundColor: colors.navy, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
+  retryTxt: { fontSize: 11, fontWeight: '800', color: colors.white },
 });

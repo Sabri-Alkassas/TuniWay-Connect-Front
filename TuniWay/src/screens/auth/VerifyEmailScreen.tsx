@@ -1,29 +1,30 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Alert,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 import type { AuthStackParamList } from '../../navigation/types';
 import { verifyEmail } from '../../services/authService';
+import { AppIcon } from '../../components/AppIcon';
 import { colors } from '../../theme/colors';
 
 export function VerifyEmailScreen() {
   type Nav = NativeStackNavigationProp<AuthStackParamList, 'VerifyEmail'>;
   const navigation = useNavigation<Nav>();
-  const route      = useRoute<any>();
-  const { email }  = route.params as { email: string };
+  const route = useRoute<any>();
+  const { email } = route.params as { email: string };
 
-  const [code, setCode]       = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const inputRef              = useRef<TextInput>(null);
+  const [error, setError] = useState('');
+  const inputRef = useRef<TextInput>(null);
 
   const onSubmit = async () => {
     if (code.trim().length < 4) {
-      setError('Entrez le code reçu par email');
+      setError('Entrez le code recu par e-mail.');
       return;
     }
 
@@ -38,18 +39,18 @@ export function VerifyEmailScreen() {
 
       if (res.verified) {
         Alert.alert(
-          'Email vérifié !',
-          'Votre compte est actif. Vous pouvez maintenant vous connecter.',
-          [{ text: 'Se connecter', onPress: () => navigation.replace('Login') }]
+          'E-mail verifie',
+          'Votre compte est maintenant actif. Vous pouvez vous connecter.',
+          [{ text: 'Se connecter', onPress: () => navigation.replace('Login') }],
         );
-      } else {
-        setError(res.message ?? 'Code invalide. Réessayez.');
-        setCode('');
-        inputRef.current?.focus();
+        return;
       }
+
+      setError(res.message ?? 'Code invalide. Reessayez.');
+      setCode('');
+      inputRef.current?.focus();
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message ?? 'Code invalide ou expiré.';
+      const message = err?.response?.data?.message ?? 'Code invalide ou expire.';
       setError(message);
       setCode('');
     } finally {
@@ -66,23 +67,27 @@ export function VerifyEmailScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.mailIcon}>
-            <Text style={styles.mailEmoji}>📧</Text>
+            <AppIcon family="Feather" name="mail" size={30} color={colors.amber} />
           </View>
-          <Text style={styles.heroTitle}>Vérifiez votre email</Text>
-          <Text style={styles.heroSub}>Un code a été envoyé à</Text>
+          <Text style={styles.heroTitle}>Verifiez votre e-mail</Text>
+          <Text style={styles.heroSub}>Un code de verification a ete envoye a</Text>
           <Text style={styles.heroEmail}>{email}</Text>
         </View>
 
-        {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.instruction}>
-            Entrez le code de vérification reçu dans votre boîte mail. Vérifiez également vos spams.
-          </Text>
+          <View style={styles.infoBox}>
+            <AppIcon family="Feather" name="info" size={14} color={colors.blue} />
+            <Text style={styles.instruction}>
+              Saisissez le code recu dans votre boite mail. Pensez aussi a verifier le dossier spam.
+            </Text>
+          </View>
 
-          <Text style={styles.label}>Code de vérification</Text>
+          <View style={styles.labelRow}>
+            <AppIcon family="Feather" name="hash" size={14} color={colors.navy} />
+            <Text style={styles.label}>Code de verification</Text>
+          </View>
 
           <TextInput
             ref={inputRef}
@@ -92,41 +97,54 @@ export function VerifyEmailScreen() {
             keyboardType="number-pad"
             maxLength={8}
             value={code}
-            onChangeText={(t) => {
-              setCode(t.replace(/\D/g, ''));
+            onChangeText={(text) => {
+              setCode(text.replace(/\D/g, ''));
               setError('');
             }}
             autoFocus
             textAlign="center"
           />
 
-          {error ? <Text style={styles.errorMsg}>{error}</Text> : null}
+          {error ? (
+            <View style={styles.errorRow}>
+              <AppIcon family="Feather" name="alert-circle" size={14} color={colors.red} />
+              <Text style={styles.errorMsg}>{error}</Text>
+            </View>
+          ) : null}
 
-          {/* Submit */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={onSubmit}
             disabled={loading}
             activeOpacity={0.85}
           >
-            {loading
-              ? <ActivityIndicator color={colors.white} />
-              : <Text style={styles.buttonText}>Vérifier</Text>
-            }
+            {loading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <View style={styles.buttonInner}>
+                <AppIcon family="Feather" name="check-circle" size={16} color={colors.white} />
+                <Text style={styles.buttonText}>Verifier</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
-          {/* Back */}
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Text style={styles.backText}>← Retour</Text>
+            <View style={styles.backInner}>
+              <AppIcon family="Feather" name="arrow-left" size={14} color={colors.blue} />
+              <Text style={styles.backText}>Retour</Text>
+            </View>
           </TouchableOpacity>
 
-          <Text style={styles.hint}>
-            Vous n avez pas reçu de code ? Vérifiez vos spams ou recommencez l inscription.
-          </Text>
+          <View style={styles.hintBox}>
+            <AppIcon family="Feather" name="help-circle" size={14} color={colors.amber} />
+            <Text style={styles.hint}>
+              Vous n&apos;avez pas recu de code ? Verifiez vos spams ou recommencez l&apos;inscription.
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -134,24 +152,29 @@ export function VerifyEmailScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:           { flex: 1, backgroundColor: colors.navy },
-  scroll:         { flexGrow: 1 },
-  hero:           { backgroundColor: colors.navy, paddingTop: 60, paddingBottom: 32, alignItems: 'center', paddingHorizontal: 24 },
-  mailIcon:       { width: 72, height: 72, borderRadius: 22, backgroundColor: 'rgba(245,166,35,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  mailEmoji:      { fontSize: 34 },
-  heroTitle:      { fontSize: 24, fontWeight: '800', color: colors.white, marginBottom: 8 },
-  heroSub:        { fontSize: 13, color: colors.muted },
-  heroEmail:      { fontSize: 14, fontWeight: '700', color: colors.amber, marginTop: 4 },
-  card:           { flex: 1, backgroundColor: colors.bgLight, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 24, paddingTop: 28 },
-  instruction:    { fontSize: 13, color: colors.muted, marginBottom: 24, lineHeight: 20 },
-  label:          { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: 8 },
-  codeInput:      { backgroundColor: colors.white, borderRadius: 14, borderWidth: 2, borderColor: colors.border, paddingHorizontal: 20, paddingVertical: 16, fontSize: 28, fontWeight: '800', color: colors.navy, letterSpacing: 8 },
-  inputError:     { borderColor: colors.red },
-  errorMsg:       { fontSize: 12, color: colors.red, marginTop: 8, textAlign: 'center' },
-  button:         { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
+  root: { flex: 1, backgroundColor: colors.navy },
+  scroll: { flexGrow: 1 },
+  hero: { backgroundColor: colors.navy, paddingTop: 60, paddingBottom: 32, alignItems: 'center', paddingHorizontal: 24 },
+  mailIcon: { width: 72, height: 72, borderRadius: 22, backgroundColor: 'rgba(245,166,35,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  heroTitle: { fontSize: 24, fontWeight: '800', color: colors.white, marginBottom: 8, textAlign: 'center' },
+  heroSub: { fontSize: 13, color: colors.muted, textAlign: 'center' },
+  heroEmail: { fontSize: 14, fontWeight: '700', color: colors.amber, marginTop: 4, textAlign: 'center' },
+  card: { flex: 1, backgroundColor: colors.bgLight, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 24, paddingTop: 28 },
+  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 24, paddingHorizontal: 4 },
+  instruction: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 20 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  codeInput: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 2, borderColor: colors.border, paddingHorizontal: 20, paddingVertical: 16, fontSize: 28, fontWeight: '800', color: colors.navy, letterSpacing: 8 },
+  inputError: { borderColor: colors.red },
+  errorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
+  errorMsg: { fontSize: 12, color: colors.red, textAlign: 'center' },
+  button: { backgroundColor: colors.red, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   buttonDisabled: { opacity: 0.7 },
-  buttonText:     { color: colors.white, fontSize: 15, fontWeight: '800' },
-  backBtn:        { marginTop: 16, alignItems: 'center' },
-  backText:       { color: colors.blue, fontSize: 13, fontWeight: '700' },
-  hint:           { textAlign: 'center', color: colors.muted, fontSize: 11, marginTop: 24, lineHeight: 18 },
+  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  buttonText: { color: colors.white, fontSize: 15, fontWeight: '800' },
+  backBtn: { marginTop: 16, alignItems: 'center' },
+  backInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backText: { color: colors.blue, fontSize: 13, fontWeight: '700' },
+  hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 24, paddingHorizontal: 4 },
+  hint: { flex: 1, textAlign: 'left', color: colors.muted, fontSize: 11, lineHeight: 18 },
 });

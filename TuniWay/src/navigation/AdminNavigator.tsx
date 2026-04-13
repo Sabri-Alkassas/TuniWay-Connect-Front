@@ -1,38 +1,48 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import type { AdminTabParamLista } from './types';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
-import { AdminStaffScreen }      from '../screens/admin/Adminstaffscreen';
+import { AdminStaffScreen } from '../screens/admin/Adminstaffscreen';
 import { AdminTransportsScreen } from '../screens/admin/Admintransportsscreen';
-import { AdminPlanningScreen }   from '../screens/admin/Adminplanningscreen';
-import { AdminProfileScreen }    from '../screens/admin/Adminprofilescreen';
-import { colors }               from '../theme/colors';
+import { AdminPlanningScreen } from '../screens/admin/Adminplanningscreen';
+import { AdminProfileScreen } from '../screens/admin/Adminprofilescreen';
+import { colors } from '../theme/colors';
+import { AppIcon } from '../components/AppIcon';
 
 const Tab = createBottomTabNavigator<AdminTabParamLista>();
 
 interface TabIconProps {
-  emoji: string;
+  family: React.ComponentProps<typeof AppIcon>['family'];
+  name: string;
   focused: boolean;
 }
 
-function TabIcon({ emoji, focused }: TabIconProps) {
+function TabIcon({ family, name, focused }: TabIconProps) {
   return (
     <View style={[styles.navIc, focused && styles.navIcOn]}>
-      <Text style={styles.navEmoji}>{emoji}</Text>
+      <AppIcon
+        family={family as never}
+        name={name as never}
+        size={16}
+        color={focused ? colors.navy : 'rgba(255,255,255,0.7)'}
+      />
     </View>
   );
 }
 
-
 export function AdminNavigator() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { height: 64 + insets.bottom, paddingBottom: Math.max(insets.bottom, 12) }],
         tabBarLabelStyle: styles.tabLabel,
-        tabBarActiveTintColor:   colors.amber,
+        tabBarActiveTintColor: colors.amber,
         tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
       }}
     >
@@ -40,16 +50,16 @@ export function AdminNavigator() {
         name="AdminDashboard"
         component={AdminDashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="⊞" focused={focused} />,
+          tabBarLabel: 'Tableau',
+          tabBarIcon: ({ focused }) => <TabIcon family="MaterialCommunityIcons" name="view-dashboard-outline" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="AdminStaff"
         component={AdminStaffScreen}
         options={{
-          tabBarLabel: 'Staff',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} />,
+          tabBarLabel: 'Équipe',
+          tabBarIcon: ({ focused }) => <TabIcon family="Feather" name="users" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -57,7 +67,7 @@ export function AdminNavigator() {
         component={AdminTransportsScreen}
         options={{
           tabBarLabel: 'Transports',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🚌" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon family="MaterialCommunityIcons" name="bus-multiple" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -65,15 +75,15 @@ export function AdminNavigator() {
         component={AdminPlanningScreen}
         options={{
           tabBarLabel: 'Planning',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📅" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon family="MaterialCommunityIcons" name="calendar-clock-outline" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="AdminProfile"
         component={AdminProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
+          tabBarLabel: 'Profil',
+          tabBarIcon: ({ focused }) => <TabIcon family="Feather" name="user" focused={focused} />,
         }}
       />
     </Tab.Navigator>
@@ -83,27 +93,22 @@ export function AdminNavigator() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.navy,
-    borderTopWidth:  0,
-    paddingTop:      9,
-    paddingBottom:   13,
-    height:          70,
+    borderTopWidth: 0,
+    paddingTop: 9,
   },
   tabLabel: {
-    fontSize:   10,
+    fontSize: 10,
     fontWeight: '700',
-    marginTop:  2,
+    marginTop: 2,
   },
   navIc: {
-    width:           28,
-    height:          28,
-    borderRadius:    9,
-    alignItems:      'center',
-    justifyContent:  'center',
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navIcOn: {
     backgroundColor: colors.amber,
-  },
-  navEmoji: {
-    fontSize: 13,
   },
 });

@@ -1,7 +1,7 @@
 export type StaffRole   = 'EMPLOYEE' | 'ADMIN';
 export type StaffStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type ShiftStatus = 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-export type TransportType = 'BUS' | 'METRO' | 'TRAM' | 'FERRY';
+export type TransportType = 'BUS' | 'METRO' | 'TRAM';
 
 
 export interface AdminDashboardResponse {

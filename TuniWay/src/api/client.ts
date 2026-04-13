@@ -1,5 +1,6 @@
 import axios, { isAxiosError } from 'axios';
 import { getApiBaseUrl } from '../config/apiBaseUrl';
+import { buildTicketQrPayload } from '../lib/ticketQr';
 import { useAuthStore } from '../store/authStore';
 import { useTicketStore } from '../store/ticketStore';
 import { useLocationStore } from '../store/locationStore';
@@ -99,9 +100,16 @@ function normalizeStop(dto: any): ClientTransportStopDto {
 }
 
 function normalizeDeparture(dto: any): ClientTransportDepartureDto {
+  const stopId = dto?.stopId != null ? String(dto.stopId) : undefined;
+  const stopOrder = dto?.stopOrder != null ? Number(dto.stopOrder) : undefined;
+  const departureTime = dto?.departureTime ? String(dto.departureTime) : '--:--';
+  const fallbackId = [stopId ?? dto?.stopName ?? 'dep', stopOrder ?? 'x', departureTime].join('-');
+
   return {
-    id: String(dto?.stopId ?? dto?.id ?? `${dto?.stopName ?? 'dep'}-${dto?.departureTime ?? ''}`),
-    departureTime: dto?.departureTime ? String(dto.departureTime) : '--:--',
+    id: String(dto?.id ?? fallbackId),
+    stopId,
+    stopOrder,
+    departureTime,
     expectedArrivalTime: undefined,
     arrivalTime: undefined,
     available: dto?.active ?? true,
@@ -111,7 +119,15 @@ function normalizeDeparture(dto: any): ClientTransportDepartureDto {
 }
 
 function normalizeTicket(dto: any): ClientTicketDto {
-  return {
+  const rawStatus = String(dto?.status ?? '').trim().toUpperCase();
+  const status =
+    rawStatus === 'ACTIVE' ? 'VALID' :
+    rawStatus === 'USED' ? 'USED' :
+    rawStatus === 'EXPIRED' ? 'EXPIRED' :
+    rawStatus === 'CANCELLED' ? 'CANCELLED' :
+    'VALID';
+
+  const normalizedTicket: ClientTicketDto = {
     id: String(dto?.ticketId ?? dto?.id ?? ''),
     productName: dto?.productName ?? '',
     transportName: dto?.transportName ?? '',
@@ -121,9 +137,16 @@ function normalizeTicket(dto: any): ClientTicketDto {
     plannedDeparture: dto?.validUntil ?? dto?.plannedDeparture ?? dto?.purchaseTime ?? new Date().toISOString(),
     price: Number(dto?.price ?? 0),
     currency: dto?.payment?.currency ?? 'TND',
-    status: dto?.status ?? 'VALID',
-    qrCode: dto?.payment?.providerReference ?? dto?.ticketId ?? dto?.id,
+    status,
+    qrCode: '',
   };
+
+  normalizedTicket.qrCode = buildTicketQrPayload({
+    ...normalizedTicket,
+    qrCode: String(dto?.payment?.providerReference ?? dto?.qrCode ?? dto?.ticketId ?? dto?.id ?? normalizedTicket.id),
+  });
+
+  return normalizedTicket;
 }
 
 function normalizeProduct(dto: any): ClientTicketProductDto {
@@ -160,10 +183,10 @@ function normalizeDashboard(dto: any): ClientDashboardResponse {
     firstName,
     lastName: rest.join(' '),
     accountStatus: dto?.status ?? '',
-    totalTrips: 0,
-    activeTickets: 0,
+    totalTrips: Number(dto?.totalTrips ?? 0),
+    activeTickets: Number(dto?.activeTickets ?? 0),
     missingFields: dto?.missingProfileFields ?? [],
-    recentTickets: [],
+    recentTickets: (dto?.recentTickets ?? []).map(normalizeTicket),
   };
 }
 
@@ -320,6 +343,10 @@ export const clientTransportApi = {
         distanceMeters: Number(item?.distanceMeters ?? 0),
         nearestStopName: item?.nearestStop?.stopName ?? '',
         matchingStopCount: item?.matchingStopCount ?? 0,
+        markerLatitude: item?.markerLatitude != null ? Number(item.markerLatitude) : undefined,
+        markerLongitude: item?.markerLongitude != null ? Number(item.markerLongitude) : undefined,
+        locationSource: item?.locationSource ?? undefined,
+        locationUpdatedAt: item?.locationUpdatedAt ? String(item.locationUpdatedAt) : undefined,
       }))
       .filter((item: any) => (!params.type || item.transport.type === params.type) && (!params.active || item.transport.active));
     return wrapData({

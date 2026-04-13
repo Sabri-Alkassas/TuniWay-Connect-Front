@@ -12,11 +12,13 @@ import { colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import type { ClientAccountResponse } from '../../types/client';
 import type { UserStackParamList } from '../../navigation/types';
+import { AppIcon } from '../../components/AppIcon';
 
 type Nav = NativeStackNavigationProp<UserStackParamList>;
 
 interface MenuRowProps {
-  emoji: string;
+  iconFamily: React.ComponentProps<typeof AppIcon>['family'];
+  iconName: string;
   bg: string;
   label: string;
   sub?: string;
@@ -24,7 +26,8 @@ interface MenuRowProps {
   onPress?: () => void;
   disabled?: boolean;
 }
-function MenuRow({ emoji, bg, label, sub, badge, onPress, disabled }: MenuRowProps) {
+
+function MenuRow({ iconFamily, iconName, bg, label, sub, badge, onPress, disabled }: MenuRowProps) {
   return (
     <TouchableOpacity
       style={[s.menuRow, disabled && s.menuRowDisabled]}
@@ -33,7 +36,7 @@ function MenuRow({ emoji, bg, label, sub, badge, onPress, disabled }: MenuRowPro
       disabled={disabled}
     >
       <View style={[s.menuIcon, { backgroundColor: bg }]}>
-        <Text style={{ fontSize: 16 }}>{emoji}</Text>
+        <AppIcon family={iconFamily as never} name={iconName as never} size={16} color={colors.navy} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.menuLabel}>{label}</Text>
@@ -44,7 +47,7 @@ function MenuRow({ emoji, bg, label, sub, badge, onPress, disabled }: MenuRowPro
           <Text style={s.menuBadgeTxt}>{badge}</Text>
         </View>
       )}
-      {!disabled && <Text style={s.menuArrow}>›</Text>}
+      {!disabled && <AppIcon family="Feather" name="chevron-right" size={18} color={colors.muted} />}
     </TouchableOpacity>
   );
 }
@@ -91,8 +94,8 @@ export function ProfileScreen() {
         <View style={s.avatar}>
           <Text style={s.avatarInit}>{initials}</Text>
         </View>
-        <Text style={s.name}>{account?.firstName ?? 'Your'} {account?.lastName ?? 'Profile'}</Text>
-        <Text style={s.email}>{account?.email ?? 'Account details unavailable'}</Text>
+        <Text style={s.name}>{account?.firstName ?? 'Votre'} {account?.lastName ?? 'profil'}</Text>
+        <Text style={s.email}>{account?.email ?? 'Détails du compte indisponibles'}</Text>
         {!!account?.role && (
           <View style={s.roleBadge}>
             <Text style={s.roleTxt}>{account.role}</Text>
@@ -125,48 +128,57 @@ export function ProfileScreen() {
 
           {account?.status && account.status !== 'ACTIVE' && (
             <View style={s.warnBanner}>
-              <Text style={{ fontSize: 16 }}>⚠️</Text>
+              <AppIcon family="Feather" name="alert-triangle" size={16} color="#7a5700" />
               <Text style={s.warnTxt}>
-                Your account is {account.status.toLowerCase()}.
+                Votre compte est {account.status.toLowerCase()}.
               </Text>
             </View>
           )}
 
           <View style={s.infoCard}>
             <View style={s.infoRow}>
-              <Text style={s.infoLbl}>Username</Text>
-              <Text style={s.infoVal}>{account?.username ?? '—'}</Text>
+              <Text style={s.infoLbl}>Nom d'utilisateur</Text>
+              <Text style={s.infoVal}>{account?.username ?? '-'}</Text>
             </View>
             <View style={s.infoDiv} />
             <View style={s.infoRow}>
-              <Text style={s.infoLbl}>Phone</Text>
-              <Text style={s.infoVal}>{account?.phone || '—'}</Text>
+              <Text style={s.infoLbl}>Téléphone</Text>
+              <Text style={s.infoVal}>{account?.phone || '-'}</Text>
             </View>
             <View style={s.infoDiv} />
             <View style={s.infoRow}>
-              <Text style={s.infoLbl}>Date of birth</Text>
-              <Text style={s.infoVal}>{account?.birthDate || '—'}</Text>
+              <Text style={s.infoLbl}>Date de naissance</Text>
+              <Text style={s.infoVal}>{account?.birthDate || '-'}</Text>
             </View>
           </View>
 
-          <Text style={s.sectionTitle}>Account</Text>
+          <Text style={s.sectionTitle}>Compte</Text>
           <View style={s.menuCard}>
             <MenuRow
-              emoji="✏️" bg={colors.blueLt} label="Edit my info"
-              sub="Name, phone, date of birth"
+              iconFamily="Feather"
+              iconName="edit-2"
+              bg={colors.blueLt}
+              label="Modifier mes informations"
+              sub="Nom, téléphone, date de naissance"
               onPress={() => navigation.navigate('EditProfile')}
             />
             <View style={s.menuDivider} />
             <MenuRow
-              emoji="🔒" bg="#f0e6ff" label="Change password"
-              sub="Not available from mobile yet"
-              badge="Soon"
+              iconFamily="Feather"
+              iconName="lock"
+              bg="#f0e6ff"
+              label="Changer le mot de passe"
+              sub="Bientôt disponible sur mobile"
+              badge="Bientôt"
               disabled
             />
             <View style={s.menuDivider} />
             <MenuRow
-              emoji="🎟" bg={colors.greenLt} label="My tickets"
-              sub="View purchase history"
+              iconFamily="MaterialCommunityIcons"
+              iconName="ticket-outline"
+              bg={colors.greenLt}
+              label="Mes billets"
+              sub="Consulter l'historique d'achat"
               onPress={() => navigation.navigate('UserTabs', { screen: 'Tickets' })}
             />
           </View>
@@ -174,19 +186,21 @@ export function ProfileScreen() {
           <Text style={s.sectionTitle}>Support</Text>
           <View style={s.menuCard}>
             <View style={s.staticRow}>
-              <Text style={s.staticLabel}>Support email</Text>
+              <Text style={s.staticLabel}>E-mail de support</Text>
               <Text style={s.staticValue}>support@tuniway.tn</Text>
             </View>
             <View style={s.menuDivider} />
             <View style={s.staticRow}>
-              <Text style={s.staticLabel}>App version</Text>
+              <Text style={s.staticLabel}>Version de l'application</Text>
               <Text style={s.staticValue}>1.0.0</Text>
             </View>
           </View>
 
           <TouchableOpacity style={s.signOutBtn} onPress={handleSignOut} activeOpacity={0.8} disabled={signingOut}>
-            {signingOut ? <ActivityIndicator color={colors.red} /> : <Text style={{ fontSize: 16 }}>↩</Text>}
-            <Text style={s.signOutTxt}>Sign out</Text>
+            {signingOut
+              ? <ActivityIndicator color={colors.red} />
+              : <AppIcon family="MaterialIcons" name="logout" size={18} color={colors.red} />}
+            <Text style={s.signOutTxt}>Se déconnecter</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -195,40 +209,39 @@ export function ProfileScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.navy },
-  hero:         { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 22, alignItems: 'center', gap: 8 },
-  centered:     { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  avatar:       { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)' },
-  avatarInit:   { fontSize: 28, fontWeight: '800', color: colors.white },
-  name:         { fontSize: 20, fontWeight: '800', color: colors.white },
-  email:        { fontSize: 12, fontWeight: '700', color: colors.muted },
-  roleBadge:    { backgroundColor: 'rgba(245,166,35,0.2)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4 },
-  roleTxt:      { fontSize: 11, fontWeight: '700', color: colors.amber },
-  body:         { flex: 1, backgroundColor: colors.bg },
-  bodyContent:  { padding: 12, paddingBottom: 24 },
-  errorBanner:  { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1.5, borderColor: '#f1b5b5' },
-  errorTxt:     { fontSize: 11, fontWeight: '700', color: colors.red },
+  safe: { flex: 1, backgroundColor: colors.navy },
+  hero: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 22, alignItems: 'center', gap: 8 },
+  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)' },
+  avatarInit: { fontSize: 28, fontWeight: '800', color: colors.white },
+  name: { fontSize: 20, fontWeight: '800', color: colors.white },
+  email: { fontSize: 12, fontWeight: '700', color: colors.muted },
+  roleBadge: { backgroundColor: 'rgba(245,166,35,0.2)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4 },
+  roleTxt: { fontSize: 11, fontWeight: '700', color: colors.amber },
+  body: { flex: 1, backgroundColor: colors.bg },
+  bodyContent: { padding: 12, paddingBottom: 24 },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1.5, borderColor: '#f1b5b5' },
+  errorTxt: { fontSize: 11, fontWeight: '700', color: colors.red },
   sectionTitle: { fontSize: 12, fontWeight: '700', color: colors.muted, marginBottom: 8, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
-  warnBanner:   { backgroundColor: '#fffbe6', borderWidth: 1.5, borderColor: '#fad15f', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  warnTxt:      { flex: 1, fontSize: 11, fontWeight: '700', color: '#7a5700' },
-  infoCard:     { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 16, overflow: 'hidden' },
-  infoRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 13 },
-  infoLbl:      { fontSize: 12, fontWeight: '700', color: colors.muted },
-  infoVal:      { fontSize: 12, fontWeight: '700', color: colors.navy },
-  infoDiv:      { height: 1, backgroundColor: colors.border },
-  menuCard:     { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 14, overflow: 'hidden' },
-  menuRow:      { flexDirection: 'row', alignItems: 'center', padding: 13, gap: 12 },
-  menuRowDisabled:{ opacity: 0.75 },
-  menuIcon:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  menuLabel:    { fontSize: 13, fontWeight: '700', color: colors.navy },
-  menuSub:      { fontSize: 10, color: colors.muted, marginTop: 1 },
-  menuBadge:    { backgroundColor: colors.redLt, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  warnBanner: { backgroundColor: '#fffbe6', borderWidth: 1.5, borderColor: '#fad15f', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  warnTxt: { flex: 1, fontSize: 11, fontWeight: '700', color: '#7a5700' },
+  infoCard: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 16, overflow: 'hidden' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 13 },
+  infoLbl: { fontSize: 12, fontWeight: '700', color: colors.muted },
+  infoVal: { fontSize: 12, fontWeight: '700', color: colors.navy },
+  infoDiv: { height: 1, backgroundColor: colors.border },
+  menuCard: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 14, overflow: 'hidden' },
+  menuRow: { flexDirection: 'row', alignItems: 'center', padding: 13, gap: 12 },
+  menuRowDisabled: { opacity: 0.75 },
+  menuIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  menuLabel: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  menuSub: { fontSize: 10, color: colors.muted, marginTop: 1 },
+  menuBadge: { backgroundColor: colors.redLt, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   menuBadgeTxt: { fontSize: 10, fontWeight: '700', color: colors.red },
-  menuArrow:    { fontSize: 18, color: colors.muted, fontWeight: '700' },
-  menuDivider:  { height: 1, backgroundColor: colors.border, marginLeft: 61 },
-  staticRow:    { padding: 13, gap: 4 },
-  staticLabel:  { fontSize: 10, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  staticValue:  { fontSize: 13, fontWeight: '700', color: colors.navy },
-  signOutBtn:   { backgroundColor: colors.white, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.border },
-  signOutTxt:   { fontSize: 14, fontWeight: '700', color: colors.red },
+  menuDivider: { height: 1, backgroundColor: colors.border, marginLeft: 61 },
+  staticRow: { padding: 13, gap: 4 },
+  staticLabel: { fontSize: 10, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  staticValue: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  signOutBtn: { backgroundColor: colors.white, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.border },
+  signOutTxt: { fontSize: 14, fontWeight: '700', color: colors.red },
 });

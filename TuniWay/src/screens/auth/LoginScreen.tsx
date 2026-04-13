@@ -126,7 +126,7 @@ export function LoginScreen() {
             render={({ field: { onChange, value, onBlur } }) => (
               <TextInput
                 style={[styles.input, errors.password_hash && styles.inputError]}
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="Entrez votre mot de passe"
                 placeholderTextColor={colors.muted}
                 secureTextEntry
                 onChangeText={onChange}

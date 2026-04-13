@@ -11,14 +11,15 @@ import { clientTransportApi, parseApiError } from '../../api/client';
 import { colors } from '../../theme/colors';
 import type { ClientTransportDto } from '../../types/client';
 import type { UserStackParamList } from '../../navigation/types';
+import { AppIcon } from '../../components/AppIcon';
 
 type Nav = NativeStackNavigationProp<UserStackParamList>;
 
-const TYPE_FILTERS: { key: string; label: string; emoji: string }[] = [
-  { key: '', label: 'All', emoji: '◈' },
-  { key: 'BUS', label: 'Bus', emoji: '🚌' },
-  { key: 'TRAIN', label: 'Train', emoji: '🚆' },
-  { key: 'METRO', label: 'Metro', emoji: '🚇' },
+const TYPE_FILTERS = [
+  { key: '', label: 'Tout', icon: 'shape-outline' },
+  { key: 'BUS', label: 'Bus', icon: 'bus' },
+  { key: 'TRAIN', label: 'Train', icon: 'train' },
+  { key: 'METRO', label: 'Métro', icon: 'subway-variant' },
 ];
 
 const TYPE_COLOR: Record<string, string> = {
@@ -29,14 +30,15 @@ interface TransportCardProps {
   transport: ClientTransportDto;
   onPress: () => void;
 }
+
 function TransportCard({ transport: t, onPress }: TransportCardProps) {
   const typeColor = TYPE_COLOR[t.type] ?? colors.muted;
+  const typeIcon = TYPE_FILTERS.find((f) => f.key === t.type)?.icon ?? 'bus';
+
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.8}>
       <View style={[s.cardIcon, { backgroundColor: `${typeColor}18` }]}>
-        <Text style={{ fontSize: 22 }}>
-          {TYPE_FILTERS.find((f) => f.key === t.type)?.emoji ?? '🚌'}
-        </Text>
+        <AppIcon family="MaterialCommunityIcons" name={typeIcon as never} size={22} color={typeColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.cardName} numberOfLines={1}>{t.name}</Text>
@@ -45,12 +47,12 @@ function TransportCard({ transport: t, onPress }: TransportCardProps) {
             <Text style={[s.typeBadgeTxt, { color: typeColor }]}>{t.type}</Text>
           </View>
           <Text style={s.cardZone}>Zone {t.zone}</Text>
-          {t.stopsCount != null && <Text style={s.cardMeta2}>· {t.stopsCount} stops</Text>}
+          {t.stopsCount != null && <Text style={s.cardMeta2}>- {t.stopsCount} arrêts</Text>}
         </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <View style={[s.activeDot, { backgroundColor: t.active ? colors.green : colors.muted }]} />
-        <Text style={{ fontSize: 18, color: colors.muted }}>›</Text>
+        <AppIcon family="Feather" name="chevron-right" size={18} color={colors.muted} />
       </View>
     </TouchableOpacity>
   );
@@ -82,6 +84,7 @@ export function SearchScreen() {
       pg = 0,
       isRefresh = false,
     } = opts;
+
     if (pg === 0) {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
@@ -93,7 +96,7 @@ export function SearchScreen() {
       const res = await clientTransportApi.search({
         query: q || undefined,
         zone: zoneText || undefined,
-        type: (type as any) || undefined,
+        type: (type as never) || undefined,
         active: active || undefined,
         page: pg,
         size: 15,
@@ -115,7 +118,6 @@ export function SearchScreen() {
   }, [activeOnly, query, typeFilter, zone]);
 
   useEffect(() => { load(); }, [load]);
-
   useEffect(() => () => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
   }, []);
@@ -125,6 +127,14 @@ export function SearchScreen() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       load({ q: text, pg: 0 });
+    }, 400);
+  };
+
+  const handleZoneChange = (text: string) => {
+    setZone(text);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      load({ zoneText: text, pg: 0 });
     }, 400);
   };
 
@@ -154,34 +164,28 @@ export function SearchScreen() {
           </View>
         </View>
         <View style={s.searchRow}>
-          <Text style={{ fontSize: 14 }}>🔍</Text>
+          <AppIcon family="Feather" name="search" size={14} color={colors.white} />
           <TextInput
             style={s.searchInput}
             value={query}
             onChangeText={handleQueryChange}
-            placeholder="Search lines, routes, zones..."
+            placeholder="Rechercher une ligne, un trajet, une zone..."
             placeholderTextColor={colors.muted}
             autoCorrect={false}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => handleQueryChange('')}>
-              <Text style={{ fontSize: 14, color: colors.muted }}>✕</Text>
+              <AppIcon family="Feather" name="x" size={14} color={colors.muted} />
             </TouchableOpacity>
           )}
         </View>
         <View style={s.searchRow}>
-          <Text style={{ fontSize: 14 }}>📌</Text>
+          <AppIcon family="Feather" name="map-pin" size={14} color={colors.white} />
           <TextInput
             style={s.searchInput}
             value={zone}
-            onChangeText={(text) => {
-              setZone(text);
-              if (searchTimer.current) clearTimeout(searchTimer.current);
-              searchTimer.current = setTimeout(() => {
-                load({ zoneText: text, pg: 0 });
-              }, 400);
-            }}
-            placeholder="Filter by zone..."
+            onChangeText={handleZoneChange}
+            placeholder="Filtrer par zone..."
             placeholderTextColor={colors.muted}
             autoCorrect={false}
           />
@@ -197,9 +201,15 @@ export function SearchScreen() {
               onPress={() => handleTypeFilter(f.key)}
               activeOpacity={0.8}
             >
-              <Text style={[s.chipTxt, typeFilter === f.key && s.chipTxtOn]}>
-                {f.emoji} {f.label}
-              </Text>
+              <View style={s.chipInner}>
+                <AppIcon
+                  family="MaterialCommunityIcons"
+                  name={f.icon as never}
+                  size={14}
+                  color={typeFilter === f.key ? colors.white : colors.navy}
+                />
+                <Text style={[s.chipTxt, typeFilter === f.key && s.chipTxtOn]}>{f.label}</Text>
+              </View>
             </TouchableOpacity>
           ))}
           <TouchableOpacity
@@ -207,7 +217,7 @@ export function SearchScreen() {
             onPress={handleActiveToggle}
             activeOpacity={0.8}
           >
-            <Text style={[s.chipTxt, activeOnly && s.chipTxtGreen]}>✅ Active only</Text>
+            <Text style={[s.chipTxt, activeOnly && s.chipTxtGreen]}>Actifs uniquement</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -241,20 +251,20 @@ export function SearchScreen() {
 
           {transports.length === 0 ? (
             <View style={s.empty}>
-              <Text style={{ fontSize: 40 }}>🚌</Text>
-              <Text style={s.emptyTxt}>No routes found</Text>
+              <AppIcon family="MaterialCommunityIcons" name="bus-stop-uncovered" size={40} color={colors.muted} />
+              <Text style={s.emptyTxt}>Aucune ligne trouvée</Text>
               <Text style={s.emptySub}>
-                {error ? 'Retry or adjust your filters.' : 'Try a different search or remove filters.'}
+                {error ? 'Réessayez ou ajustez vos filtres.' : 'Essayez une autre recherche ou retirez quelques filtres.'}
               </Text>
               {!!error && (
                 <TouchableOpacity style={s.retryBtn} onPress={() => load({ pg: 0 })} activeOpacity={0.8}>
-                  <Text style={s.retryTxt}>Retry</Text>
+                  <Text style={s.retryTxt}>Réessayer</Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : (
             <>
-              <Text style={s.resultCount}>{transports.length} routes</Text>
+              <Text style={s.resultCount}>{transports.length} ligne{transports.length !== 1 ? 's' : ''}</Text>
               {transports.map((t) => (
                 <TransportCard
                   key={t.id}
@@ -272,42 +282,43 @@ export function SearchScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.navy },
-  searchBar:    { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 12, gap: 12 },
-  logoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBadge:    { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: colors.navy },
+  searchBar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 12, gap: 12 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
   logoBadgeTxt: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  logoText:     { fontSize: 14, fontWeight: '800', color: colors.white },
-  logoAccent:   { color: colors.amber },
-  logoSub:      { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
-  searchRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  searchInput:  { flex: 1, fontSize: 13, color: colors.white, fontWeight: '600' },
-  filterWrap:   { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  filterRow:    { paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row' },
-  chip:         { borderRadius: 20, paddingHorizontal: 13, paddingVertical: 6, backgroundColor: colors.bgLight, borderWidth: 1.5, borderColor: colors.border },
-  chipOn:       { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipGreen:    { backgroundColor: colors.bgLight, borderColor: colors.green },
-  chipTxt:      { fontSize: 11, fontWeight: '700', color: colors.navy },
-  chipTxtOn:    { color: colors.white },
+  logoText: { fontSize: 14, fontWeight: '800', color: colors.white },
+  logoAccent: { color: colors.amber },
+  logoSub: { fontSize: 8, fontWeight: '700', color: '#6ec0f5', letterSpacing: 2 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  searchInput: { flex: 1, fontSize: 13, color: colors.white, fontWeight: '600' },
+  filterWrap: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 6, flexDirection: 'row' },
+  chip: { borderRadius: 20, paddingHorizontal: 13, paddingVertical: 6, backgroundColor: colors.bgLight, borderWidth: 1.5, borderColor: colors.border },
+  chipInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipGreen: { backgroundColor: colors.bgLight, borderColor: colors.green },
+  chipTxt: { fontSize: 11, fontWeight: '700', color: colors.navy },
+  chipTxtOn: { color: colors.white },
   chipTxtGreen: { color: '#27500A' },
-  body:         { flex: 1, backgroundColor: colors.bgLight },
-  bodyContent:  { padding: 12, paddingBottom: 24 },
-  centered:     { flex: 1, backgroundColor: colors.bgLight, alignItems: 'center', justifyContent: 'center' },
-  resultCount:  { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
-  errorBanner:  { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
-  errorText:    { fontSize: 11, fontWeight: '700', color: colors.red },
-  card:         { backgroundColor: colors.white, borderRadius: 14, padding: 13, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-  cardIcon:     { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  cardName:     { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: 5 },
-  cardMeta:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  typeBadge:    { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  body: { flex: 1, backgroundColor: colors.bgLight },
+  bodyContent: { padding: 12, paddingBottom: 24 },
+  centered: { flex: 1, backgroundColor: colors.bgLight, alignItems: 'center', justifyContent: 'center' },
+  resultCount: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 10 },
+  errorBanner: { backgroundColor: colors.redLt, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1.5, borderColor: '#f1b5b5' },
+  errorText: { fontSize: 11, fontWeight: '700', color: colors.red },
+  card: { backgroundColor: colors.white, borderRadius: 14, padding: 13, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  cardIcon: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  cardName: { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: 5 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typeBadge: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   typeBadgeTxt: { fontSize: 10, fontWeight: '700' },
-  cardZone:     { fontSize: 10, fontWeight: '700', color: colors.muted },
-  cardMeta2:    { fontSize: 10, color: colors.muted },
-  activeDot:    { width: 8, height: 8, borderRadius: 4 },
-  empty:        { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
-  emptyTxt:     { fontSize: 15, fontWeight: '700', color: colors.muted },
-  emptySub:     { fontSize: 12, color: colors.muted, textAlign: 'center' },
-  retryBtn:     { marginTop: 8, backgroundColor: colors.navy, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11 },
-  retryTxt:     { fontSize: 13, fontWeight: '700', color: colors.white },
+  cardZone: { fontSize: 10, fontWeight: '700', color: colors.muted },
+  cardMeta2: { fontSize: 10, color: colors.muted },
+  activeDot: { width: 8, height: 8, borderRadius: 4 },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
+  emptyTxt: { fontSize: 15, fontWeight: '700', color: colors.muted },
+  emptySub: { fontSize: 12, color: colors.muted, textAlign: 'center' },
+  retryBtn: { marginTop: 8, backgroundColor: colors.navy, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11 },
+  retryTxt: { fontSize: 13, fontWeight: '700', color: colors.white },
 });
