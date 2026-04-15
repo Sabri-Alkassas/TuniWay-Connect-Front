@@ -31,7 +31,15 @@ const RECENT_ACTIVITY = [
   { id: '4', action: 'Planning publie', detail: '3 services pour demain', time: 'il y a 2 h', dot: colors.red },
 ];
 
-const QUICK_ACTIONS = [
+type QuickAction = {
+  key: 'addStaff' | 'newTransport' | 'planShifts' | 'publishPlan';
+  label: string;
+  sub: string;
+  bg: string;
+  icon: React.ComponentProps<typeof AppIcon>;
+};
+
+const QUICK_ACTIONS: QuickAction[] = [
   {
     key: 'addStaff',
     label: 'Ajouter un agent',
@@ -75,6 +83,19 @@ function StatTile({ label, value, accent = colors.amber }: StatTileProps) {
       <Text style={styles.statTileLbl}>{label}</Text>
     </View>
   );
+}
+
+function QuickActionIcon({ icon }: { icon: QuickAction['icon'] }) {
+  switch (icon.family) {
+    case 'Feather':
+      return <AppIcon family="Feather" name={icon.name} size={20} color={icon.color} />;
+    case 'Ionicons':
+      return <AppIcon family="Ionicons" name={icon.name} size={20} color={icon.color} />;
+    case 'MaterialIcons':
+      return <AppIcon family="MaterialIcons" name={icon.name} size={20} color={icon.color} />;
+    default:
+      return <AppIcon family="MaterialCommunityIcons" name={icon.name} size={20} color={icon.color} />;
+  }
 }
 
 export function AdminDashboardScreen() {
@@ -272,7 +293,7 @@ export function AdminDashboardScreen() {
                   <View style={[styles.qaIcon, { backgroundColor: qa.bg }]}>
                     {publishing && qa.key === 'publishPlan'
                       ? <ActivityIndicator color={colors.red} size="small" />
-                      : <AppIcon family={qa.icon.family} name={qa.icon.name} size={20} color={qa.icon.color} />}
+                      : <QuickActionIcon icon={qa.icon} />}
                   </View>
                   <Text style={styles.qaLabel}>{qa.label}</Text>
                   <Text style={styles.qaSub}>{qa.sub}</Text>

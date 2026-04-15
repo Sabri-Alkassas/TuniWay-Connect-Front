@@ -1,7 +1,7 @@
 export type StaffRole   = 'EMPLOYEE' | 'ADMIN';
 export type StaffStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-export type ShiftStatus = 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-export type TransportType = 'BUS' | 'METRO' | 'TRAM';
+export type ShiftStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TransportType = 'BUS' | 'METRO' | 'TRAIN';
 
 
 export interface AdminDashboardResponse {
@@ -24,6 +24,9 @@ export interface StaffAccountResponse {
   email:          string;
   role:           StaffRole;
   status:         StaffStatus;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
+  twoFactorSetupUri?: string;
   licenseNumber?: string;
   employeeCode?:  string;
   adminCode?:     string;
@@ -131,6 +134,13 @@ export interface UpdateShiftBody {
 
 export interface ReassignTransportBody {
   transportId: string;
+}
+
+export interface CreateShiftBody {
+  employeeId: string;
+  transportId: string;
+  scheduleStart: string;
+  scheduleEnd: string;
 }
 
 

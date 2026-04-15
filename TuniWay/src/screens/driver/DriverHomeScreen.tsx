@@ -106,12 +106,26 @@ function pickPrimaryShift(shifts: EmployeeScheduleShiftDto[]) {
   );
 }
 
-function canArrive(status: EmployeeStopStatus) {
-  return status === 'PENDING';
+function canArrive(stop: EmployeeShiftStopDto, currentStop: EmployeeShiftStopDto | null, nextStop: EmployeeShiftStopDto | null) {
+  return !currentStop && stop.status === 'PENDING' && nextStop?.stopId === stop.stopId;
 }
 
-function canDepart(status: EmployeeStopStatus) {
-  return status === 'PENDING' || status === 'ARRIVED';
+function canDepart(stop: EmployeeShiftStopDto, currentStop: EmployeeShiftStopDto | null) {
+  return stop.status === 'ARRIVED' && currentStop?.stopId === stop.stopId;
+}
+
+function findCurrentStop(progress: EmployeeShiftProgressResponse | null, stops: EmployeeShiftStopDto[]) {
+  if (progress?.currentStop?.stopId) {
+    return stops.find((stop) => stop.stopId === progress.currentStop?.stopId) ?? null;
+  }
+  return stops.find((stop) => stop.status === 'ARRIVED') ?? null;
+}
+
+function findNextPendingStop(progress: EmployeeShiftProgressResponse | null, stops: EmployeeShiftStopDto[]) {
+  if (progress?.nextStop?.stopId) {
+    return stops.find((stop) => stop.stopId === progress.nextStop?.stopId) ?? null;
+  }
+  return stops.find((stop) => stop.status === 'PENDING') ?? null;
 }
 
 export function DriverHomeScreen() {
@@ -262,6 +276,8 @@ export function DriverHomeScreen() {
   const inProgressCount = schedule.filter((shift) => shift.status === 'IN_PROGRESS').length;
   const scheduledCount = schedule.filter((shift) => shift.status === 'SCHEDULED').length;
   const completedCount = schedule.filter((shift) => shift.status === 'COMPLETED').length;
+  const currentStop = findCurrentStop(progress, stops);
+  const nextPendingStop = findNextPendingStop(progress, stops);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -450,6 +466,45 @@ export function DriverHomeScreen() {
                           Derniere position: {progress?.currentLocationUpdatedAt ? formatDateTime(progress.currentLocationUpdatedAt) : 'Pas encore envoyee'}
                         </Text>
                       </View>
+                      {selectedShift.status === 'IN_PROGRESS' && (
+                        <View style={s.nextActionCard}>
+                          <Text style={s.nextActionLabel}>{currentStop ? 'Arret atteint' : 'Prochaine station a confirmer'}</Text>
+                          <Text style={s.nextActionValue}>
+                            {currentStop?.stopName ?? nextPendingStop?.stopName ?? 'Aucun arret en attente'}
+                          </Text>
+                          <Text style={s.nextActionHint}>
+                            {currentStop
+                              ? 'Marquez le depart quand la montee et la descente sont terminees.'
+                              : nextPendingStop
+                                ? `Appuyez sur le bouton des que vous atteignez la station ${nextPendingStop.stopOrder ?? '-'}.`
+                                : 'Tous les arrets de ce service ont deja ete traites.'}
+                          </Text>
+                          {currentStop && (
+                            <TouchableOpacity
+                              style={[s.primaryBtn, actionLoading === `depart-${currentStop.stopId}` && s.btnDisabled]}
+                              onPress={() => handleStopAction(currentStop.stopId, 'depart')}
+                              disabled={actionLoading === `depart-${currentStop.stopId}`}
+                              activeOpacity={0.88}
+                            >
+                              {actionLoading === `depart-${currentStop.stopId}`
+                                ? <ActivityIndicator color={colors.white} />
+                                : <Text style={s.primaryBtnText}>Marquer le depart</Text>}
+                            </TouchableOpacity>
+                          )}
+                          {!currentStop && nextPendingStop && (
+                            <TouchableOpacity
+                              style={[s.primaryBtn, actionLoading === `arrive-${nextPendingStop.stopId}` && s.btnDisabled]}
+                              onPress={() => handleStopAction(nextPendingStop.stopId, 'arrive')}
+                              disabled={actionLoading === `arrive-${nextPendingStop.stopId}`}
+                              activeOpacity={0.88}
+                            >
+                              {actionLoading === `arrive-${nextPendingStop.stopId}`
+                                ? <ActivityIndicator color={colors.white} />
+                                : <Text style={s.primaryBtnText}>Marquer l arrivee</Text>}
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
                     </View>
 
                     <View style={s.panel}>
@@ -460,6 +515,8 @@ export function DriverHomeScreen() {
                         stops.map((stop) => {
                           const actionKeyArrive = `arrive-${stop.stopId}`;
                           const actionKeyDepart = `depart-${stop.stopId}`;
+                          const stopCanArrive = canArrive(stop, currentStop, nextPendingStop);
+                          const stopCanDepart = canDepart(stop, currentStop);
                           return (
                             <View key={stop.stopId} style={s.stopCard}>
                               <View style={s.stopTop}>
@@ -479,8 +536,8 @@ export function DriverHomeScreen() {
                               {selectedShift.status === 'IN_PROGRESS' && (
                                 <View style={s.stopActions}>
                                   <TouchableOpacity
-                                    style={[s.stopBtn, !canArrive(stop.status) && s.stopBtnDisabled]}
-                                    disabled={!canArrive(stop.status) || actionLoading === actionKeyArrive}
+                                    style={[s.stopBtn, !stopCanArrive && s.stopBtnDisabled]}
+                                    disabled={!stopCanArrive || actionLoading === actionKeyArrive}
                                     onPress={() => handleStopAction(stop.stopId, 'arrive')}
                                     activeOpacity={0.88}
                                   >
@@ -489,8 +546,8 @@ export function DriverHomeScreen() {
                                       : <Text style={s.stopBtnText}>Arrivee</Text>}
                                   </TouchableOpacity>
                                   <TouchableOpacity
-                                    style={[s.stopBtn, !canDepart(stop.status) && s.stopBtnDisabled]}
-                                    disabled={!canDepart(stop.status) || actionLoading === actionKeyDepart}
+                                    style={[s.stopBtn, !stopCanDepart && s.stopBtnDisabled]}
+                                    disabled={!stopCanDepart || actionLoading === actionKeyDepart}
                                     onPress={() => handleStopAction(stop.stopId, 'depart')}
                                     activeOpacity={0.88}
                                   >
@@ -660,6 +717,16 @@ const s = StyleSheet.create({
     backgroundColor: colors.navy,
     padding: 14,
   },
+  nextActionCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    backgroundColor: colors.bg,
+    padding: 14,
+    gap: 8,
+  },
+  nextActionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted },
+  nextActionValue: { fontSize: 16, fontWeight: '800', color: colors.navy },
+  nextActionHint: { fontSize: 11, color: colors.muted, lineHeight: 17 },
   currentStopLabel: { fontSize: 11, fontWeight: '700', color: colors.muted },
   currentStopValue: { fontSize: 16, fontWeight: '800', color: colors.white, marginTop: 4 },
   currentStopHint: { fontSize: 11, color: '#d9e3f5', marginTop: 4 },

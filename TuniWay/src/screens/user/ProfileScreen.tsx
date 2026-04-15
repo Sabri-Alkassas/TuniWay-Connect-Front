@@ -178,7 +178,7 @@ export function ProfileScreen() {
               iconName="ticket-outline"
               bg={colors.greenLt}
               label="Mes billets"
-              sub="Consulter l'historique d'achat"
+              sub="Consulter l&apos;historique d&apos;achat"
               onPress={() => navigation.navigate('UserTabs', { screen: 'Tickets' })}
             />
           </View>
