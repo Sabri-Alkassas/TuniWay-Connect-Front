@@ -7,26 +7,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { adminShiftApi, adminPlanningApi, adminTransportApi } from '../../api/admin';
+import { adminPlanningApi, adminShiftApi, adminStaffApi, adminTransportApi } from '../../api/admin';
 import { AppIcon } from '../../components/AppIcon';
 import { colors } from '../../theme/colors';
 import type {
   AdminShiftResponse,
   ShiftStatus,
+  StaffAccountResponse,
+  CreateShiftBody,
   UpdateShiftBody,
   ReassignTransportBody,
   TransportResponse,
 } from '../../types/admin';
 
-const FALLBACK: AdminShiftResponse[] = [
-  { id: 's1', employeeId: 'e1', employeeName: 'Karim Ben Ali', transportId: 't1', transportName: 'Ligne 5 - Lac vers Bardo', startTime: '2026-04-11T06:00:00', endTime: '2026-04-11T14:00:00', status: 'ACTIVE' },
-  { id: 's2', employeeId: 'e2', employeeName: 'Sana Mejri', transportId: 't2', transportName: 'Metro 2 - Ariana', startTime: '2026-04-11T07:30:00', endTime: '2026-04-11T15:30:00', status: 'ACTIVE' },
-  { id: 's3', employeeId: 'e4', employeeName: 'Leila Boussaid', transportId: 't4', transportName: 'Tram T1 - Centre', startTime: '2026-04-11T14:00:00', endTime: '2026-04-11T22:00:00', status: 'SCHEDULED' },
-  { id: 's4', employeeId: 'e5', employeeName: 'Mehdi Slama', transportId: 't1', transportName: 'Ligne 5 - Lac vers Bardo', startTime: '2026-04-11T22:00:00', endTime: '2026-04-12T06:00:00', status: 'SCHEDULED' },
-  { id: 's5', employeeId: 'e3', employeeName: 'Rami Chatti', transportId: 't3', transportName: 'Ligne 8 - Bab Bhar', startTime: '2026-04-10T06:00:00', endTime: '2026-04-10T14:00:00', status: 'COMPLETED' },
-];
-
 const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const createShiftSchema = z.object({
+  employeeId: z.string().uuid('Selectionnez un employe'),
+  transportId: z.string().uuid('Selectionnez un transport'),
+  startTime: z.string().regex(ISO_DATETIME_RE, 'Format : AAAA-MM-JJTHH:mm'),
+  endTime: z.string().regex(ISO_DATETIME_RE, 'Format : AAAA-MM-JJTHH:mm'),
+});
 const updateShiftSchema = z.object({
   startTime: z.string().regex(ISO_DATETIME_RE, 'Format : AAAA-MM-JJTHH:mm'),
   endTime: z.string().regex(ISO_DATETIME_RE, 'Format : AAAA-MM-JJTHH:mm'),
@@ -35,6 +35,7 @@ const reassignSchema = z.object({
   transportId: z.string().min(1, 'Le transport est obligatoire'),
 });
 
+type CreateShiftFormData = z.infer<typeof createShiftSchema>;
 type UpdateShiftFormData = z.infer<typeof updateShiftSchema>;
 type ReassignFormData = z.infer<typeof reassignSchema>;
 
@@ -48,11 +49,16 @@ function formatDate(iso: string) {
   catch { return iso; }
 }
 
+function toApiInstant(value: string) {
+  const normalized = value.length === 16 ? `${value}:00` : value;
+  return new Date(normalized).toISOString();
+}
+
 function getStatusLabel(status: ShiftStatus | 'ALL') {
   const labels: Record<ShiftStatus | 'ALL', string> = {
     ALL: 'Tous',
     SCHEDULED: 'Planifie',
-    ACTIVE: 'Actif',
+    IN_PROGRESS: 'En service',
     COMPLETED: 'Termine',
     CANCELLED: 'Annule',
   };
@@ -61,16 +67,154 @@ function getStatusLabel(status: ShiftStatus | 'ALL') {
 
 const STATUS_COLOR: Record<ShiftStatus, string> = {
   SCHEDULED: colors.amber,
-  ACTIVE: colors.green,
+  IN_PROGRESS: colors.green,
   COMPLETED: colors.blue,
   CANCELLED: colors.red,
 };
 const STATUS_BG: Record<ShiftStatus, string> = {
   SCHEDULED: 'rgba(245,166,35,0.18)',
-  ACTIVE: '#eaf3de',
+  IN_PROGRESS: '#eaf3de',
   COMPLETED: '#e6f1fb',
   CANCELLED: '#ffe8e3',
 };
+
+function CreateShiftModal({ visible, onClose, onCreated }: {
+  visible: boolean;
+  onClose: () => void;
+  onCreated: (created: AdminShiftResponse) => void;
+}) {
+  const [employees, setEmployees] = useState<StaffAccountResponse[]>([]);
+  const [transports, setTransports] = useState<TransportResponse[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateShiftFormData>({
+    resolver: zodResolver(createShiftSchema),
+    defaultValues: { employeeId: '', transportId: '', startTime: '', endTime: '' },
+  });
+
+  useEffect(() => {
+    if (!visible) return;
+    let mounted = true;
+    const loadOptions = async () => {
+      setLoadingOptions(true);
+      try {
+        const [staffRes, transportRes] = await Promise.all([
+          adminStaffApi.list(),
+          adminTransportApi.list(),
+        ]);
+        if (!mounted) return;
+        setEmployees(staffRes.data.filter((staff: StaffAccountResponse) => staff.role === 'EMPLOYEE' && staff.status === 'ACTIVE'));
+        setTransports(transportRes.data.filter((transport: TransportResponse) => transport.active));
+      } catch {
+        if (!mounted) return;
+        setEmployees([]);
+        setTransports([]);
+      } finally {
+        if (mounted) setLoadingOptions(false);
+      }
+    };
+    loadOptions();
+    return () => { mounted = false; };
+  }, [visible]);
+
+  const onSubmit = async (data: CreateShiftFormData) => {
+    try {
+      const body: CreateShiftBody = {
+        employeeId: data.employeeId,
+        transportId: data.transportId,
+        scheduleStart: toApiInstant(data.startTime),
+        scheduleEnd: toApiInstant(data.endTime),
+      };
+      const res = await adminShiftApi.create(body);
+      onCreated(res.data);
+      reset();
+      onClose();
+    } catch (err: any) {
+      Alert.alert('Erreur', err?.response?.data?.message ?? 'Echec de la creation du service');
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
+      <SafeAreaView style={mStyles.safe}>
+        <View style={mStyles.header}>
+          <TouchableOpacity onPress={() => { reset(); onClose(); }} style={mStyles.closeBtn}>
+            <AppIcon family="Feather" name="x" size={16} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={mStyles.title}>Nouveau service</Text>
+          <TouchableOpacity onPress={handleSubmit(onSubmit)} style={mStyles.saveBtn}>
+            <Text style={mStyles.saveTxt}>Enregistrer</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+          {loadingOptions ? (
+            <ActivityIndicator color={colors.amber} />
+          ) : (
+            <>
+              <Text style={fStyles.label}>Employe actif</Text>
+              <Controller
+                control={control}
+                name="employeeId"
+                render={({ field: { value, onChange } }) => (
+                  <View style={styles.transportPicker}>
+                    {employees.map((employee) => (
+                      <TouchableOpacity key={employee.id} style={[styles.transportOption, value === employee.id && styles.transportOptionOn]} onPress={() => onChange(employee.id)}>
+                        <Text style={styles.transportOptionName}>{employee.firstName} {employee.lastName}</Text>
+                        <Text style={styles.transportOptionMeta}>{employee.employeeCode ?? employee.email}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              />
+              {!!errors.employeeId && <Text style={fStyles.error}>{errors.employeeId.message}</Text>}
+
+              <Text style={fStyles.label}>Transport actif</Text>
+              <Controller
+                control={control}
+                name="transportId"
+                render={({ field: { value, onChange } }) => (
+                  <View style={styles.transportPicker}>
+                    {transports.map((transport) => (
+                      <TouchableOpacity key={transport.id} style={[styles.transportOption, value === transport.id && styles.transportOptionOn]} onPress={() => onChange(transport.id)}>
+                        <Text style={styles.transportOptionName}>{transport.name}</Text>
+                        <Text style={styles.transportOptionMeta}>Zone {transport.zone}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              />
+              {!!errors.transportId && <Text style={fStyles.error}>{errors.transportId.message}</Text>}
+
+              <Text style={fStyles.label}>Heure de debut</Text>
+              <Controller
+                control={control}
+                name="startTime"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <View style={{ marginBottom: 14 }}>
+                    <TextInput style={[fStyles.input, !!errors.startTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-14T06:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
+                    {!!errors.startTime && <Text style={fStyles.error}>{errors.startTime.message}</Text>}
+                  </View>
+                )}
+              />
+
+              <Text style={fStyles.label}>Heure de fin</Text>
+              <Controller
+                control={control}
+                name="endTime"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <View style={{ marginBottom: 14 }}>
+                    <TextInput style={[fStyles.input, !!errors.endTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-14T14:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
+                    {!!errors.endTime && <Text style={fStyles.error}>{errors.endTime.message}</Text>}
+                  </View>
+                )}
+              />
+              <View style={mStyles.hint}><Text style={mStyles.hintTxt}>Format : AAAA-MM-JJTHH:mm</Text></View>
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
 
 function EditShiftModal({ visible, shift, onClose, onSaved }: {
   visible: boolean;
@@ -92,8 +236,8 @@ function EditShiftModal({ visible, shift, onClose, onSaved }: {
     if (!shift) return;
     try {
       const body: UpdateShiftBody = {
-        startTime: data.startTime.length === 16 ? `${data.startTime}:00` : data.startTime,
-        endTime: data.endTime.length === 16 ? `${data.endTime}:00` : data.endTime,
+        startTime: toApiInstant(data.startTime),
+        endTime: toApiInstant(data.endTime),
       };
       const res = await adminShiftApi.update(shift.id, body);
       onSaved(res.data);
@@ -307,9 +451,10 @@ function ShiftCard({ shift, onEdit, onReassign }: {
 }
 
 export function AdminPlanningScreen() {
-  const [shifts, setShifts] = useState<AdminShiftResponse[]>(FALLBACK);
+  const [shifts, setShifts] = useState<AdminShiftResponse[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | ShiftStatus>('ALL');
+  const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<AdminShiftResponse | null>(null);
   const [reassignTarget, setReassignTarget] = useState<AdminShiftResponse | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -319,7 +464,7 @@ export function AdminPlanningScreen() {
       const res = await adminShiftApi.list();
       setShifts(res.data);
     } catch {
-      setShifts(FALLBACK);
+      setShifts([]);
     } finally {
       if (isRefresh) setRefreshing(false);
     }
@@ -357,8 +502,14 @@ export function AdminPlanningScreen() {
       <View style={styles.topbar}>
         <View>
           <Text style={styles.topTitle}>Planning des services</Text>
-          <Text style={styles.topSub}>{shifts.filter((shift) => shift.status === 'ACTIVE').length} actifs - {scheduledCount} planifies</Text>
+          <Text style={styles.topSub}>{shifts.filter((shift) => shift.status === 'IN_PROGRESS').length} actifs - {scheduledCount} planifies</Text>
         </View>
+        <TouchableOpacity style={styles.createBtn} onPress={() => setCreateOpen(true)} activeOpacity={0.88}>
+          <View style={styles.createBtnInner}>
+            <AppIcon family="Feather" name="plus" size={14} color={colors.white} />
+            <Text style={styles.createBtnText}>Nouveau</Text>
+          </View>
+        </TouchableOpacity>
       </View>
       {scheduledCount > 0 && (
         <TouchableOpacity style={styles.publishBar} onPress={handlePublish} disabled={publishing} activeOpacity={0.9}>
@@ -366,7 +517,7 @@ export function AdminPlanningScreen() {
         </TouchableOpacity>
       )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={styles.filterContent}>
-        {(['ALL', 'ACTIVE', 'SCHEDULED', 'COMPLETED', 'CANCELLED'] as const).map((status) => (
+        {(['ALL', 'IN_PROGRESS', 'SCHEDULED', 'COMPLETED', 'CANCELLED'] as const).map((status) => (
           <TouchableOpacity key={status} style={[styles.chip, statusFilter === status && styles.chipOn]} onPress={() => setStatusFilter(status)}>
             <Text style={[styles.chipTxt, statusFilter === status && styles.chipTxtOn]}>{getStatusLabel(status)}</Text>
           </TouchableOpacity>
@@ -380,6 +531,10 @@ export function AdminPlanningScreen() {
       >
         {filtered.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTxt}>Aucun service trouve</Text></View> : filtered.map((shift) => <ShiftCard key={shift.id} shift={shift} onEdit={() => setEditTarget(shift)} onReassign={() => setReassignTarget(shift)} />)}
       </ScrollView>
+      <CreateShiftModal visible={createOpen} onClose={() => setCreateOpen(false)} onCreated={(created) => {
+        setShifts((prev) => [created, ...prev].sort((a, b) => b.startTime.localeCompare(a.startTime)));
+        setCreateOpen(false);
+      }} />
       <EditShiftModal visible={!!editTarget} shift={editTarget} onClose={() => setEditTarget(null)} onSaved={(updated) => { setShifts((prev) => prev.map((shift) => (shift.id === updated.id ? updated : shift))); setEditTarget(null); }} />
       <ReassignModal visible={!!reassignTarget} shift={reassignTarget} onClose={() => setReassignTarget(null)} onSaved={(updated) => { setShifts((prev) => prev.map((shift) => (shift.id === updated.id ? updated : shift))); setReassignTarget(null); }} />
     </SafeAreaView>
@@ -431,9 +586,12 @@ const scStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.navy },
-  topbar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 11 },
+  topbar: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   topTitle: { fontSize: 15, fontWeight: '800', color: colors.white },
   topSub: { fontSize: 10, color: colors.muted, marginTop: 1 },
+  createBtn: { backgroundColor: colors.red, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  createBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  createBtnText: { fontSize: 12, fontWeight: '800', color: colors.white },
   publishBar: { backgroundColor: colors.red, marginHorizontal: 12, marginBottom: 4, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   publishDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.white },
   publishTxt: { flex: 1, fontSize: 12, fontWeight: '800', color: colors.white },

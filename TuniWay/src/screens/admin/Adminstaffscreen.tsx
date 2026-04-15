@@ -40,12 +40,16 @@ function getStatusLabel(status: StaffStatus) {
   const labels: Record<StaffStatus, string> = { ACTIVE: 'Actif', INACTIVE: 'Inactif', SUSPENDED: 'Suspendu' };
   return labels[status];
 }
+function getTwoFactorLabel(enabled?: boolean) {
+  return enabled ? '2FA activee' : '2FA inactive';
+}
 function initials(first: string, last: string) {
   return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
 }
 
 const STATUS_COLOR: Record<StaffStatus, string> = { ACTIVE: colors.green, INACTIVE: colors.muted, SUSPENDED: colors.red };
 const ROLE_COLOR: Record<StaffRole, string> = { EMPLOYEE: colors.blue, ADMIN: colors.amber };
+const TWO_FACTOR_COLOR = colors.green;
 
 function Field({ label, value, onChange, onBlur, error, placeholder, secure, keyboard, optional }: {
   label: string; value: string; onChange: (v: string) => void; onBlur?: () => void; error?: string; placeholder?: string; secure?: boolean; keyboard?: 'default' | 'email-address'; optional?: boolean;
@@ -81,6 +85,15 @@ function CreateStaffModal({ visible, onClose, onCreated }: {
       const body: RegisterStaffBody = { firstName: data.firstName, lastName: data.lastName, email: data.email, password: data.password, role: data.role, ...(data.role === 'EMPLOYEE' && { licenseNumber: data.licenseNumber, employeeCode: data.employeeCode }), ...(data.role === 'ADMIN' && { adminCode: data.adminCode }) };
       const res = await adminStaffApi.create(body);
       onCreated(res.data);
+      if (res.data.twoFactorSecret) {
+        const setupHint = res.data.twoFactorSetupUri
+          ? `URI de configuration :\n${res.data.twoFactorSetupUri}\n\n`
+          : '';
+        Alert.alert(
+          '2FA activee',
+          `Le compte a ete cree avec la 2FA activee.\n\nSecret TOTP : ${res.data.twoFactorSecret}\n\n${setupHint}Transmettez ces informations au membre du personnel pour configurer son application d'authentification avant sa premiere connexion.`
+        );
+      }
       reset();
       onClose();
     } catch (err: any) {
@@ -170,6 +183,7 @@ function StaffCard({ staff, onEdit, onToggle, onDelete }: {
           <View style={cStyles.badges}>
             <View style={[cStyles.badge, { backgroundColor: ROLE_COLOR[staff.role] + '22' }]}><Text style={[cStyles.badgeTxt, { color: ROLE_COLOR[staff.role] }]}>{getRoleLabel(staff.role)}</Text></View>
             <View style={[cStyles.badge, { backgroundColor: STATUS_COLOR[staff.status] + '22' }]}><Text style={[cStyles.badgeTxt, { color: STATUS_COLOR[staff.status] }]}>{getStatusLabel(staff.status)}</Text></View>
+            <View style={[cStyles.badge, { backgroundColor: TWO_FACTOR_COLOR + '22' }]}><Text style={[cStyles.badgeTxt, { color: TWO_FACTOR_COLOR }]}>{getTwoFactorLabel(staff.twoFactorEnabled)}</Text></View>
           </View>
         </View>
       </View>

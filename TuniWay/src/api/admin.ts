@@ -12,9 +12,12 @@ import type {
   UpdateTransportDeparturesBody,
   UpdateTransportZoneBody,
   AdminShiftResponse,
+  CreateShiftBody,
   UpdateShiftBody,
   ReassignTransportBody,
   PublishPlanningBody,
+  ShiftStatus,
+  TransportType,
 } from '../types/admin';
 
 function wrap<T>(data: T): { data: T } {
@@ -38,6 +41,9 @@ function normalizeStaff(dto: any): StaffAccountResponse {
     email: dto?.email ?? '',
     role: dto?.role ?? 'EMPLOYEE',
     status: dto?.status ?? 'INACTIVE',
+    twoFactorEnabled: typeof dto?.twoFactorEnabled === 'boolean' ? dto.twoFactorEnabled : undefined,
+    twoFactorSecret: dto?.twoFactorSecret ?? undefined,
+    twoFactorSetupUri: dto?.twoFactorSetupUri ?? undefined,
     licenseNumber: dto?.license_number ?? undefined,
     employeeCode: dto?.employee_code ?? undefined,
     adminCode: dto?.admin_code ?? undefined,
@@ -46,10 +52,14 @@ function normalizeStaff(dto: any): StaffAccountResponse {
 }
 
 function normalizeTransport(dto: any): TransportResponse {
+  const rawType = String(dto?.type ?? 'BUS').trim().toUpperCase();
+  const type: TransportType =
+    rawType === 'METRO' || rawType === 'TRAIN' ? rawType : 'BUS';
+
   return {
     id: String(dto?.id ?? dto?.code ?? ''),
     name: dto?.name ?? dto?.code ?? 'Transport',
-    type: dto?.type ?? 'BUS',
+    type: rawType === 'TRAM' ? 'TRAIN' : type,
     zone: dto?.zone ?? '',
     active: Boolean(dto?.active),
     stopsCount: dto?.stopsCount ?? 0,
@@ -58,6 +68,14 @@ function normalizeTransport(dto: any): TransportResponse {
 }
 
 function normalizeShift(dto: any): AdminShiftResponse {
+  const normalizedStatus = String(dto?.status ?? 'SCHEDULED').trim().toUpperCase();
+  const status: ShiftStatus =
+    normalizedStatus === 'ACTIVE'
+      ? 'IN_PROGRESS'
+      : normalizedStatus === 'IN_PROGRESS' || normalizedStatus === 'COMPLETED' || normalizedStatus === 'CANCELLED'
+        ? normalizedStatus
+        : 'SCHEDULED';
+
   return {
     id: String(dto?.shiftId ?? dto?.id ?? ''),
     employeeId: String(dto?.employeeId ?? ''),
@@ -66,7 +84,7 @@ function normalizeShift(dto: any): AdminShiftResponse {
     transportName: dto?.transportName ?? '',
     startTime: dto?.scheduleStart ?? dto?.startTime ?? new Date().toISOString(),
     endTime: dto?.scheduleEnd ?? dto?.endTime ?? new Date().toISOString(),
-    status: dto?.status ?? 'SCHEDULED',
+    status,
   };
 }
 
@@ -200,6 +218,11 @@ export const adminShiftApi = {
   async list() {
     const { data } = await apiClient.get('/admin/shifts');
     return wrap((data ?? []).map(normalizeShift));
+  },
+
+  async create(body: CreateShiftBody) {
+    const { data } = await apiClient.post('/admin/shifts', body);
+    return wrap(normalizeShift(data));
   },
 
   async update(id: string, body: UpdateShiftBody) {

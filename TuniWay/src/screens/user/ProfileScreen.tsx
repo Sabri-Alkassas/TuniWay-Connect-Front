@@ -137,7 +137,7 @@ export function ProfileScreen() {
 
           <View style={s.infoCard}>
             <View style={s.infoRow}>
-              <Text style={s.infoLbl}>Nom d'utilisateur</Text>
+              <Text style={s.infoLbl}>Nom d&apos;utilisateur</Text>
               <Text style={s.infoVal}>{account?.username ?? '-'}</Text>
             </View>
             <View style={s.infoDiv} />
@@ -178,7 +178,7 @@ export function ProfileScreen() {
               iconName="ticket-outline"
               bg={colors.greenLt}
               label="Mes billets"
-              sub="Consulter l'historique d'achat"
+              sub="Consulter l&apos;historique d&apos;achat"
               onPress={() => navigation.navigate('UserTabs', { screen: 'Tickets' })}
             />
           </View>
@@ -191,7 +191,7 @@ export function ProfileScreen() {
             </View>
             <View style={s.menuDivider} />
             <View style={s.staticRow}>
-              <Text style={s.staticLabel}>Version de l'application</Text>
+              <Text style={s.staticLabel}>Version de l&apos;application</Text>
               <Text style={s.staticValue}>1.0.0</Text>
             </View>
           </View>

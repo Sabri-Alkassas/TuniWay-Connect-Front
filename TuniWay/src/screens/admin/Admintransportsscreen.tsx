@@ -12,14 +12,8 @@ import { AppIcon } from '../../components/AppIcon';
 import { colors } from '../../theme/colors';
 import type { TransportResponse, TransportType, CreateTransportBody, UpdateTransportBody, TransportStopItem } from '../../types/admin';
 
-const TRANSPORT_TYPES: TransportType[] = ['BUS', 'METRO', 'TRAM'];
-const TYPE_COLOR: Record<TransportType, string> = { BUS: colors.red, METRO: colors.blue, TRAM: colors.green };
-const FALLBACK: TransportResponse[] = [
-  { id: '1', name: 'Ligne 5 - Lac vers Bardo', type: 'BUS', zone: 'A', active: true, stopsCount: 18, departuresCount: 24 },
-  { id: '2', name: 'Metro 2 - Ariana', type: 'METRO', zone: 'B', active: true, stopsCount: 12, departuresCount: 30 },
-  { id: '3', name: 'Ligne 8 - Bab Bhar', type: 'BUS', zone: 'A', active: false, stopsCount: 9, departuresCount: 14 },
-  { id: '4', name: 'Tram T1 - Centre', type: 'TRAM', zone: 'C', active: true, stopsCount: 22, departuresCount: 40 },
-];
+const TRANSPORT_TYPES: TransportType[] = ['BUS', 'METRO', 'TRAIN'];
+const TYPE_COLOR: Record<TransportType, string> = { BUS: colors.red, METRO: colors.blue, TRAIN: colors.green };
 const FALLBACK_STOPS: TransportStopItem[] = [
   { id: 's1', stopOrder: 1, name: 'Terminus Lac', zone: 'A', active: true },
   { id: 's2', stopOrder: 2, name: 'Place Pasteur', zone: 'A', active: true },
@@ -27,20 +21,20 @@ const FALLBACK_STOPS: TransportStopItem[] = [
 ];
 const transportSchema = z.object({
   name: z.string().min(2, 'Minimum 2 caracteres'),
-  type: z.enum(['BUS', 'METRO', 'TRAM']),
+  type: z.enum(['BUS', 'METRO', 'TRAIN']),
   zone: z.string().min(1, 'La zone est obligatoire'),
   active: z.boolean(),
 });
 type TransportFormData = z.infer<typeof transportSchema>;
 
 function getTypeLabel(type: TransportType) {
-  const labels: Record<TransportType, string> = { BUS: 'Bus', METRO: 'Metro', TRAM: 'Tram' };
+  const labels: Record<TransportType, string> = { BUS: 'Bus', METRO: 'Metro', TRAIN: 'Train' };
   return labels[type];
 }
 function typeIcon(type: TransportType, color: string) {
   if (type === 'BUS') return <AppIcon family="MaterialIcons" name="directions-bus" size={20} color={color} />;
   if (type === 'METRO') return <AppIcon family="MaterialIcons" name="train" size={20} color={color} />;
-  return <AppIcon family="MaterialCommunityIcons" name="tram" size={20} color={color} />;
+  return <AppIcon family="MaterialCommunityIcons" name="train" size={20} color={color} />;
 }
 
 function Field({ label, value, onChange, onBlur, error, placeholder }: {
@@ -176,7 +170,8 @@ function TransportCard({ transport: t, onEdit, onStops, onToggle }: {
 }
 
 export function AdminTransportsScreen() {
-  const [transports, setTransports] = useState<TransportResponse[]>(FALLBACK);
+  const [transports, setTransports] = useState<TransportResponse[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransportType>('ALL');
@@ -185,7 +180,15 @@ export function AdminTransportsScreen() {
   const [stopsTarget, setStopsTarget] = useState<TransportResponse | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    try { const res = await adminTransportApi.list(); setTransports(res.data); } catch { } finally { if (isRefresh) setRefreshing(false); }
+    try {
+      const res = await adminTransportApi.list();
+      setTransports(res.data);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Impossible de charger les transports');
+    } finally {
+      if (isRefresh) setRefreshing(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -221,6 +224,7 @@ export function AdminTransportsScreen() {
         {(['ALL', ...TRANSPORT_TYPES] as const).map((r) => <TouchableOpacity key={r} style={[styles.chip, typeFilter === r && styles.chipOn]} onPress={() => setTypeFilter(r as any)}><Text style={[styles.chipTxt, typeFilter === r && styles.chipTxtOn]}>{r === 'ALL' ? 'Tous' : getTypeLabel(r as TransportType)}</Text></TouchableOpacity>)}
       </ScrollView>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.amber} />}>
+        {!!error && <View style={styles.errorBanner}><Text style={styles.errorText}>{error}</Text></View>}
         {filtered.map((t) => <TransportCard key={t.id} transport={t} onEdit={() => { setEditTarget(t); setFormOpen(true); }} onStops={() => setStopsTarget(t)} onToggle={() => handleToggle(t)} />)}
       </ScrollView>
       <TransportFormModal visible={formOpen} transport={editTarget} onClose={() => { setFormOpen(false); setEditTarget(null); }} onSaved={handleSaved} />
@@ -298,4 +302,6 @@ const styles = StyleSheet.create({
   chipTxtOn: { color: colors.navy },
   body: { flex: 1, backgroundColor: colors.bgLight, marginTop: 8 },
   bodyContent: { padding: 12, paddingBottom: 24 },
+  errorBanner: { backgroundColor: '#fff0f0', borderWidth: 1.5, borderColor: '#f6b5b5', borderRadius: 14, padding: 12, marginBottom: 10 },
+  errorText: { fontSize: 11, fontWeight: '700', color: colors.red },
 });
