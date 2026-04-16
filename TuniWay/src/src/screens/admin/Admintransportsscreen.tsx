@@ -32,21 +32,108 @@ function typeIcon(type: TransportType, color: string) {
   return <AppIcon family="MaterialCommunityIcons" name="train" size={20} color={color} />;
 }
 
-type EditableStop = TransportStopItem & { minutesToNext?: string };
 const HH_MM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const WEEK_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'] as const;
+const DAY_OPTIONS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+const DAY_LABELS: Record<(typeof DAY_OPTIONS)[number], string> = {
+  Monday: 'Lun',
+  Tuesday: 'Mar',
+  Wednesday: 'Mer',
+  Thursday: 'Jeu',
+  Friday: 'Ven',
+  Saturday: 'Sam',
+  Sunday: 'Dim',
+};
+const DEFAULT_PLANNING_START_TIME = '06:00';
+const DEFAULT_MINUTES_BETWEEN_STOPS: Record<TransportType, number> = {
+  BUS: 4,
+  METRO: 3,
+  TRAIN: 5,
+};
 
-function addMinutesToHHmm(time: string, minutesToAdd: number) {
-  const match = HH_MM_REGEX.exec(time);
-  if (!match) {
-    return time;
+function normalizeDayLabel(dayOfWeek: string) {
+  const normalized = dayOfWeek.trim().toLowerCase();
+  const aliases: Record<string, (typeof DAY_OPTIONS)[number]> = {
+    monday: 'Monday',
+    lundi: 'Monday',
+    lun: 'Monday',
+    tuesday: 'Tuesday',
+    mardi: 'Tuesday',
+    mar: 'Tuesday',
+    wednesday: 'Wednesday',
+    mercredi: 'Wednesday',
+    mer: 'Wednesday',
+    thursday: 'Thursday',
+    jeudi: 'Thursday',
+    jeu: 'Thursday',
+    friday: 'Friday',
+    vendredi: 'Friday',
+    ven: 'Friday',
+    saturday: 'Saturday',
+    samedi: 'Saturday',
+    sam: 'Saturday',
+    sunday: 'Sunday',
+    dimanche: 'Sunday',
+    dim: 'Sunday',
+  };
+  if (aliases[normalized]) {
+    return aliases[normalized];
   }
+  return DAY_OPTIONS.find((day) => day.toLowerCase() === normalized) ?? 'Monday';
+}
 
-  const baseMinutes = Number(match[1]) * 60 + Number(match[2]);
-  const totalMinutes = ((baseMinutes + minutesToAdd) % (24 * 60) + (24 * 60)) % (24 * 60);
-  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
-  const mm = String(totalMinutes % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
+function normalizeTimeValue(value?: string | null) {
+  const candidate = String(value ?? '').trim().slice(0, 5);
+  return HH_MM_REGEX.test(candidate) ? candidate : null;
+}
+
+function addMinutesToTime(time: string, minutesToAdd: number) {
+  const normalized = normalizeTimeValue(time) ?? DEFAULT_PLANNING_START_TIME;
+  const [hours, minutes] = normalized.split(':').map(Number);
+  const totalMinutes = (hours * 60) + minutes + Math.max(0, minutesToAdd);
+  const minutesInDay = 24 * 60;
+  const wrappedMinutes = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+  const nextHours = Math.floor(wrappedMinutes / 60);
+  const nextMinutes = wrappedMinutes % 60;
+  return `${String(nextHours).padStart(2, '0')}:${String(nextMinutes).padStart(2, '0')}`;
+}
+
+function buildStopPlanningTimes(stops: TransportStopItem[], currentTimes: Record<string, string>, transportType: TransportType) {
+  const nextTimes: Record<string, string> = {};
+  const minutesBetweenStops = DEFAULT_MINUTES_BETWEEN_STOPS[transportType];
+  let previousTime: string | null = null;
+
+  stops.forEach((stop) => {
+    if (!stop.id) return;
+
+    const explicitTime = normalizeTimeValue(currentTimes[stop.id]);
+    const resolvedTime = explicitTime
+      ?? (previousTime ? addMinutesToTime(previousTime, minutesBetweenStops) : DEFAULT_PLANNING_START_TIME);
+
+    nextTimes[stop.id] = resolvedTime;
+    previousTime = resolvedTime;
+  });
+
+  return nextTimes;
+}
+
+function rebuildSequentialPlanningTimes(stops: TransportStopItem[], currentTimes: Record<string, string>, transportType: TransportType) {
+  const nextTimes: Record<string, string> = {};
+  const minutesBetweenStops = DEFAULT_MINUTES_BETWEEN_STOPS[transportType];
+  let previousTime: string | null = null;
+
+  stops.forEach((stop, index) => {
+    if (!stop.id) return;
+
+    if (index === 0) {
+      previousTime = normalizeTimeValue(currentTimes[stop.id]) ?? DEFAULT_PLANNING_START_TIME;
+    } else {
+      previousTime = addMinutesToTime(previousTime ?? DEFAULT_PLANNING_START_TIME, minutesBetweenStops);
+    }
+
+    nextTimes[stop.id] = previousTime;
+  });
+
+  return nextTimes;
 }
 
 function Field({ label, value, onChange, onBlur, error, placeholder }: {
@@ -107,17 +194,53 @@ function TransportFormModal({ visible, transport, onClose, onSaved }: {
   );
 }
 
-function StopsEditorModal({ visible, transportId, transportName, onClose }: {
-  visible: boolean; transportId: string; transportName: string; onClose: () => void;
+function StopsEditorModal({ visible, transportId, transportName, transportType, onClose }: {
+  visible: boolean; transportId: string; transportName: string; transportType: TransportType; onClose: () => void;
 }) {
-  const [stops, setStops] = useState<EditableStop[]>([]);
+  const [stops, setStops] = useState<TransportStopItem[]>([]);
+  const [selectedDays, setSelectedDays] = useState<string[]>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+  const [stopTimes, setStopTimes] = useState<Record<string, string>>({});
   const [catalog, setCatalog] = useState<AdminStopResponse[]>([]);
   const [query, setQuery] = useState('');
-  const [autoGenerateDepartures, setAutoGenerateDepartures] = useState(false);
-  const [firstDepartureTime, setFirstDepartureTime] = useState('06:00');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const updateStop = (idx: number, key: keyof EditableStop, val: any) => setStops((prev) => prev.map((s, i) => i === idx ? { ...s, [key]: val } : s));
+  const defaultMinutesBetweenStops = DEFAULT_MINUTES_BETWEEN_STOPS[transportType];
+  const updateStop = (idx: number, key: keyof TransportStopItem, val: any) => setStops((prev) => prev.map((s, i) => i === idx ? { ...s, [key]: val } : s));
+  const updateStopTime = (stopId: string, time: string) => {
+    setStopTimes((prev) => ({ ...prev, [stopId]: time }));
+  };
+
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length === 1) {
+          return prev;
+        }
+        return prev.filter((item) => item !== day);
+      }
+      return [...prev, day];
+    });
+  };
+
+  const applyTimeForward = (stopId: string) => {
+    setStopTimes((prev) => {
+      const startIndex = stops.findIndex((stop) => stop.id === stopId);
+      if (startIndex < 0) return prev;
+
+      const baseTime = normalizeTimeValue(prev[stopId]) ?? DEFAULT_PLANNING_START_TIME;
+      const next = { ...prev, [stopId]: baseTime };
+      let previousTime = baseTime;
+
+      for (let index = startIndex + 1; index < stops.length; index += 1) {
+        const currentStopId = stops[index].id;
+        if (!currentStopId) continue;
+        previousTime = addMinutesToTime(previousTime, defaultMinutesBetweenStops);
+        next[currentStopId] = previousTime;
+      }
+
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -125,10 +248,37 @@ function StopsEditorModal({ visible, transportId, transportName, onClose }: {
     Promise.all([
       adminTransportApi.listStops(),
       adminTransportApi.getStops(transportId),
+      adminTransportApi.getDepartures(transportId),
     ])
-      .then(([catalogRes, stopsRes]) => {
+      .then(([catalogRes, stopsRes, departuresRes]) => {
+        const loadedStops = (stopsRes.data ?? [])
+          .filter((item: TransportStopItem) => item.id)
+          .map((item: TransportStopItem) => ({ ...item }));
+
+        const loadedDepartures = (departuresRes.data ?? []).map((item: any) => ({
+          ...item,
+          time: item.time?.slice(0, 5) ?? '06:00',
+          dayOfWeek: normalizeDayLabel(item.dayOfWeek),
+        }));
+
+        const daySet = new Set(loadedDepartures.map((item: any) => normalizeDayLabel(item.dayOfWeek)));
+        const days = daySet.size > 0 ? DAY_OPTIONS.filter((day) => daySet.has(day)) : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+        const nextTimes = buildStopPlanningTimes(
+          loadedStops,
+          loadedStops.reduce<Record<string, string>>((acc, stop) => {
+            if (!stop.id) return acc;
+            const stopDeparture = loadedDepartures.find((dep: any) => dep.stopId === stop.id);
+            acc[stop.id] = stopDeparture?.time ?? '';
+            return acc;
+          }, {}),
+          transportType,
+        );
+
         setCatalog(catalogRes.data.filter((item: AdminStopResponse) => item.id));
-        setStops((stopsRes.data ?? []).filter((item: TransportStopItem) => item.id).map((item: TransportStopItem) => ({ ...item, minutesToNext: '8' })));
+        setStops(loadedStops);
+        setSelectedDays(days);
+        setStopTimes(nextTimes);
       })
       .catch((err: any) => {
         Alert.alert('Erreur', err?.response?.data?.message ?? 'Impossible de charger les arrets');
@@ -136,23 +286,27 @@ function StopsEditorModal({ visible, transportId, transportName, onClose }: {
       .finally(() => {
         setLoading(false);
       });
-  }, [visible, transportId]);
+  }, [visible, transportId, transportType]);
 
   const addStop = (stop: AdminStopResponse) => {
     if (stops.some((item) => item.id === stop.id)) return;
-    setStops((prev) => ([
-      ...prev,
-      {
-        id: stop.id,
-        stopOrder: prev.length + 1,
-        name: stop.name,
-        zone: stop.zone,
-        active: stop.active,
-        lat: stop.lat,
-        lng: stop.lng,
-        minutesToNext: '8',
-      },
-    ]));
+    setStops((prev) => {
+      const next = [
+        ...prev,
+        {
+          id: stop.id,
+          stopOrder: prev.length + 1,
+          name: stop.name,
+          zone: stop.zone,
+          active: stop.active,
+          lat: stop.lat,
+          lng: stop.lng,
+        },
+      ];
+
+      setStopTimes((prevTimes) => buildStopPlanningTimes(next, prevTimes, transportType));
+      return next;
+    });
   };
 
   const moveStop = (idx: number, direction: 'up' | 'down') => {
@@ -163,69 +317,75 @@ function StopsEditorModal({ visible, transportId, transportName, onClose }: {
       const temp = next[idx];
       next[idx] = next[target];
       next[target] = temp;
-      return next.map((item, orderIdx) => ({ ...item, stopOrder: orderIdx + 1 }));
+      const reorderedStops = next.map((item, orderIdx) => ({ ...item, stopOrder: orderIdx + 1 }));
+      setStopTimes((prevTimes) => rebuildSequentialPlanningTimes(reorderedStops, prevTimes, transportType));
+      return reorderedStops;
     });
   };
 
-  const removeStop = (idx: number) => setStops((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stopOrder: i + 1 })));
+  const removeStop = (idx: number) => {
+    setStops((prevStops) => {
+      const removed = prevStops[idx];
+      const nextStops = prevStops.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stopOrder: i + 1 }));
 
-  const buildAutoDepartures = () => {
-    if (!HH_MM_REGEX.test(firstDepartureTime)) {
-      throw new Error('Heure de depart invalide (format HH:mm)');
-    }
-
-    const segmentMinutes: number[] = [];
-    for (let i = 0; i < stops.length - 1; i += 1) {
-      const value = Number(stops[i].minutesToNext);
-      if (!Number.isInteger(value) || value <= 0) {
-        throw new Error(`Temps invalide entre l arret ${i + 1} et ${i + 2}`);
+      if (removed?.id) {
+        setStopTimes((prevTimes) => {
+          const next = { ...prevTimes };
+          delete next[removed.id as string];
+          return rebuildSequentialPlanningTimes(nextStops, next, transportType);
+        });
       }
-      segmentMinutes.push(value);
-    }
 
-    const cumulativeMinutesByStop: number[] = [];
-    let cumulative = 0;
-    for (let i = 0; i < stops.length; i += 1) {
-      cumulativeMinutesByStop.push(cumulative);
-      if (i < segmentMinutes.length) {
-        cumulative += segmentMinutes[i];
-      }
-    }
-
-    return {
-      departures: WEEK_DAYS.flatMap((dayOfWeek) =>
-        stops.map((stop, index) => {
-          if (!stop.id) {
-            throw new Error('Un arret selectionne est invalide');
-          }
-          return {
-            stopId: stop.id,
-            stopOrder: index + 1,
-            dayOfWeek,
-            time: addMinutesToHHmm(firstDepartureTime, cumulativeMinutesByStop[index]),
-            active: true,
-          };
-        }),
-      ),
-    };
+      return nextStops;
+    });
   };
 
   const handleSave = async () => {
     if (stops.length < 2) { Alert.alert('Validation', 'Selectionnez au moins 2 arrets.'); return; }
+    if (selectedDays.length === 0) { Alert.alert('Validation', 'Selectionnez au moins un jour.'); return; }
 
     const normalizedStops = stops.map((stop, index) => ({
       ...stop,
       stopOrder: index + 1,
     }));
 
+    const payloadStops = normalizedStops.map((stop) => ({
+      id: stop.id,
+      stopOrder: stop.stopOrder,
+      name: stop.name,
+      zone: stop.zone,
+      active: stop.active,
+      lat: stop.lat,
+      lng: stop.lng,
+    }));
+
     setSaving(true);
     try {
-      await adminTransportApi.updateStops(transportId, { stops: normalizedStops });
+      await adminTransportApi.updateStops(transportId, { stops: payloadStops });
 
-      if (autoGenerateDepartures) {
-        const autoDepartures = buildAutoDepartures();
-        await adminTransportApi.updateDepartures(transportId, autoDepartures);
-      }
+      const normalizedStopTimes = buildStopPlanningTimes(normalizedStops, stopTimes, transportType);
+      setStopTimes(normalizedStopTimes);
+
+      const manualDepartures = normalizedStops.flatMap((stop) => {
+        if (!stop.id) {
+          throw new Error('Chaque arret doit avoir un identifiant valide');
+        }
+
+        const stopTime = (normalizedStopTimes[stop.id] ?? DEFAULT_PLANNING_START_TIME).slice(0, 5);
+        if (!HH_MM_REGEX.test(stopTime)) {
+          throw new Error(`L heure de l arret ${stop.name} doit etre au format HH:mm`);
+        }
+
+        return selectedDays.map((day) => ({
+          stopId: stop.id as string,
+          stopOrder: stop.stopOrder,
+          dayOfWeek: normalizeDayLabel(day),
+          time: stopTime,
+          active: stop.active !== false,
+        }));
+      });
+
+      await adminTransportApi.updateDepartures(transportId, { departures: manualDepartures });
 
       onClose();
     } catch (err: any) {
@@ -278,7 +438,7 @@ function StopsEditorModal({ visible, transportId, transportName, onClose }: {
           </View>
 
           <Text style={[fStyles.label, { marginBottom: 8 }]}>Trajet selectionne</Text>
-          {stops.map((stop, idx) => <View key={idx} style={sStyles.card}>
+          {stops.map((stop, idx) => <View key={stop.id ?? `${stop.name}-${stop.zone}-${idx}`} style={sStyles.card}>
             <View style={sStyles.header}>
               <View style={sStyles.order}><Text style={sStyles.orderTxt}>{idx + 1}</Text></View>
               <Text style={sStyles.stopTitle} numberOfLines={1}>{stop.name || `Arret ${idx + 1}`}</Text>
@@ -291,46 +451,68 @@ function StopsEditorModal({ visible, transportId, transportName, onClose }: {
               <Text style={[sStyles.input, { flex: 2 }]}>{stop.name}</Text>
               <Text style={[sStyles.input, { flex: 1 }]}>Zone {stop.zone || '-'}</Text>
             </View>
-            {idx < stops.length - 1 ? (
-              <View style={sStyles.timeRow}>
-                <Text style={sStyles.timeLabel}>Temps vers arret suivant (min)</Text>
-                <TextInput
-                  style={sStyles.timeInput}
-                  value={stop.minutesToNext ?? ''}
-                  onChangeText={(v) => updateStop(idx, 'minutesToNext', v.replace(/[^0-9]/g, ''))}
-                  keyboardType="number-pad"
-                  placeholder="8"
-                  placeholderTextColor={colors.muted}
-                  maxLength={3}
-                />
-              </View>
-            ) : null}
           </View>)}
           {stops.length === 0 ? <Text style={sStyles.emptyTxt}>Aucun arret selectionne.</Text> : null}
 
-          <View style={sStyles.autoCard}>
-            <View style={sStyles.autoHeader}>
+          <View style={sStyles.departureCard}>
+            <View style={sStyles.departureHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={fStyles.label}>Generer un planning simple</Text>
-                <Text style={sStyles.autoHelp}>Cree des departs automatiques a partir des temps saisis.</Text>
+                <Text style={fStyles.label}>Planning par arret</Text>
+                <Text style={sStyles.autoHelp}>Vous modifiez ici le planning modele du transport. Base par defaut: premier depart a {DEFAULT_PLANNING_START_TIME}, puis +{defaultMinutesBetweenStops} min par arret pour {getTypeLabel(transportType).toLowerCase()}.</Text>
               </View>
-              <Switch value={autoGenerateDepartures} onValueChange={setAutoGenerateDepartures} trackColor={{ true: colors.green, false: colors.border }} thumbColor={colors.white} />
             </View>
-            {autoGenerateDepartures ? (
-              <View style={sStyles.firstDepartureRow}>
-                <Text style={sStyles.timeLabel}>Premier depart (HH:mm)</Text>
-                <TextInput
-                  style={sStyles.firstDepartureInput}
-                  value={firstDepartureTime}
-                  onChangeText={setFirstDepartureTime}
-                  placeholder="06:00"
-                  placeholderTextColor={colors.muted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={5}
-                />
+
+            <Text style={sStyles.dayBlockLabel}>Jours actifs</Text>
+            <View style={sStyles.dayPicker}>
+              {DAY_OPTIONS.map((day) => {
+                const active = selectedDays.includes(day);
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[sStyles.dayChip, active && sStyles.dayChipActive]}
+                    onPress={() => toggleDay(day)}
+                    activeOpacity={0.82}
+                  >
+                    <Text style={[sStyles.dayChipTxt, active && sStyles.dayChipTxtActive]}>{DAY_LABELS[day]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {stops.length === 0 ? (
+              <Text style={sStyles.emptyTxt}>Ajoutez des arrets pour configurer les horaires.</Text>
+            ) : (
+              <View style={sStyles.stopScheduleList}>
+                {stops.map((stop, idx) => (
+                  <View key={stop.id ?? `${stop.name}-${idx}`} style={sStyles.stopScheduleRow}>
+                    <Text style={sStyles.stopScheduleLabel} numberOfLines={1}>{stop.stopOrder}. {stop.name}</Text>
+                    <TextInput
+                      style={sStyles.timeInput}
+                      value={stop.id ? (stopTimes[stop.id] ?? DEFAULT_PLANNING_START_TIME) : DEFAULT_PLANNING_START_TIME}
+                      onChangeText={(value) => {
+                        if (!stop.id) return;
+                        updateStopTime(stop.id, value.replace(/[^0-9:]/g, '').slice(0, 5));
+                      }}
+                      placeholder={DEFAULT_PLANNING_START_TIME}
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={5}
+                    />
+                    <TouchableOpacity
+                      style={sStyles.linkAllBtn}
+                      onPress={() => {
+                        if (!stop.id) return;
+                        applyTimeForward(stop.id);
+                      }}
+                      activeOpacity={0.82}
+                    >
+                      <Text style={sStyles.linkAllTxt}>Suite</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
-            ) : null}
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -434,7 +616,7 @@ export function AdminTransportsScreen() {
         {filtered.map((t) => <TransportCard key={t.id} transport={t} onEdit={() => { setEditTarget(t); setFormOpen(true); }} onStops={() => setStopsTarget(t)} onToggle={() => handleToggle(t)} />)}
       </ScrollView>
       <TransportFormModal visible={formOpen} transport={editTarget} onClose={() => { setFormOpen(false); setEditTarget(null); }} onSaved={handleSaved} />
-      {stopsTarget && <StopsEditorModal visible={!!stopsTarget} transportId={stopsTarget.id} transportName={stopsTarget.name} onClose={() => setStopsTarget(null)} />}
+      {stopsTarget && <StopsEditorModal visible={!!stopsTarget} transportId={stopsTarget.id} transportName={stopsTarget.name} transportType={stopsTarget.type} onClose={() => setStopsTarget(null)} />}
     </SafeAreaView>
   );
 }
@@ -464,11 +646,20 @@ const sStyles = StyleSheet.create({
   timeRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   timeLabel: { fontSize: 11, fontWeight: '700', color: colors.navy },
   timeInput: { width: 72, backgroundColor: colors.bgLight, borderRadius: 9, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, color: colors.navy, textAlign: 'center' },
-  autoCard: { marginTop: 10, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, padding: 12 },
-  autoHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  departureCard: { marginTop: 10, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, padding: 12 },
+  departureHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  dayBlockLabel: { fontSize: 11, fontWeight: '700', color: colors.navy, marginBottom: 6 },
+  dayPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  dayChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  dayChipActive: { borderColor: colors.navy, backgroundColor: colors.navy },
+  dayChipTxt: { fontSize: 9, fontWeight: '800', color: colors.muted },
+  dayChipTxtActive: { color: colors.white },
+  stopScheduleList: { gap: 8 },
+  stopScheduleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bgLight, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 8 },
+  stopScheduleLabel: { flex: 1, fontSize: 11, fontWeight: '700', color: colors.navy },
+  linkAllBtn: { borderWidth: 1, borderColor: colors.navy, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: colors.white },
+  linkAllTxt: { fontSize: 10, fontWeight: '800', color: colors.navy },
   autoHelp: { fontSize: 10, color: colors.muted, marginTop: 2 },
-  firstDepartureRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  firstDepartureInput: { width: 90, backgroundColor: colors.bgLight, borderRadius: 9, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, color: colors.navy, textAlign: 'center' },
   emptyTxt: { fontSize: 11, fontWeight: '700', color: colors.muted, textAlign: 'center', marginTop: 8 },
 });
 const mStyles = StyleSheet.create({

@@ -100,6 +100,18 @@ function normalizeStop(dto: any): AdminStopResponse {
   };
 }
 
+function normalizeDeparture(dto: any) {
+  const id = dto?.id != null ? String(dto.id).trim() : '';
+  return {
+    id: id || undefined,
+    stopId: String(dto?.stopId ?? ''),
+    dayOfWeek: dto?.dayOfWeek ?? 'Monday',
+    time: dto?.departureTime ? String(dto.departureTime).slice(0, 5) : '06:00',
+    active: dto?.active !== false,
+    stopOrder: dto?.stopOrder != null ? Number(dto.stopOrder) : 0,
+  };
+}
+
 export const adminDashboardApi = {
   async get() {
     const { data } = await apiClient.get('/admin/dashboard');
@@ -113,6 +125,7 @@ export const adminDashboardApi = {
       shiftsPending: data?.scheduledShifts ?? 0,
       shiftsActive: data?.inProgressShifts ?? 0,
       shiftsCompleted: data?.completedShifts ?? 0,
+      recentActivity: data?.recentActivity ?? [],
     });
   },
 };
@@ -224,6 +237,11 @@ export const adminTransportApi = {
       lng: item?.longitude != null ? Number(item.longitude) : undefined,
     }));
     return wrap(stops);
+  },
+
+  async getDepartures(id: string) {
+    const { data } = await apiClient.get(`/admin/transports/${id}/departures`);
+    return wrap((data?.departures ?? []).map(normalizeDeparture));
   },
 
   updateDepartures: (id: string, body: UpdateTransportDeparturesBody) =>
