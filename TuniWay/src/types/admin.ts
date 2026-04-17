@@ -93,15 +93,6 @@ export interface TransportStopItem {
   lng?:       number;
 }
 
-export interface AdminStopResponse {
-  id: string;
-  name: string;
-  zone: string;
-  active: boolean;
-  lat?: number;
-  lng?: number;
-}
-
 export interface UpdateTransportStopsBody {
   stops: TransportStopItem[];
 }

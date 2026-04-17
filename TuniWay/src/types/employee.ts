@@ -94,12 +94,3 @@ export interface EmployeeShiftLocationResponse {
   longitude: number;
   updatedAt: string | null;
 }
-
-export interface EmployeeTicketValidationResponse {
-  success: boolean;
-  message: string;
-  shiftId?: string;
-  ticketId?: string;
-  status?: string;
-  validatedAt?: string | null;
-}
