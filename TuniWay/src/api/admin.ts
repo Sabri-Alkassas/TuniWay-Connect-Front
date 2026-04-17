@@ -11,7 +11,6 @@ import type {
   UpdateTransportStopsBody,
   UpdateTransportDeparturesBody,
   UpdateTransportZoneBody,
-  AdminStopResponse,
   AdminShiftResponse,
   CreateShiftBody,
   UpdateShiftBody,
@@ -86,17 +85,6 @@ function normalizeShift(dto: any): AdminShiftResponse {
     startTime: dto?.scheduleStart ?? dto?.startTime ?? new Date().toISOString(),
     endTime: dto?.scheduleEnd ?? dto?.endTime ?? new Date().toISOString(),
     status,
-  };
-}
-
-function normalizeStop(dto: any): AdminStopResponse {
-  return {
-    id: String(dto?.stopId ?? dto?.id ?? ''),
-    name: dto?.stopName ?? dto?.name ?? '',
-    zone: dto?.zone ?? '',
-    active: dto?.active !== false,
-    lat: dto?.latitude != null ? Number(dto.latitude) : undefined,
-    lng: dto?.longitude != null ? Number(dto.longitude) : undefined,
   };
 }
 
@@ -203,28 +191,13 @@ export const adminTransportApi = {
       stops: body.stops.map((stop) => ({
         stopId: stop.id,
         stopOrder: stop.stopOrder,
+        stopName: stop.name,
+        zone: stop.zone,
         active: stop.active,
+        latitude: stop.lat,
+        longitude: stop.lng,
       })),
     }),
-
-  async listStops() {
-    const { data } = await apiClient.get('/admin/stops');
-    return wrap((data ?? []).map(normalizeStop));
-  },
-
-  async getStops(id: string) {
-    const { data } = await apiClient.get(`/admin/transports/${id}/stops`);
-    const stops = (data?.stops ?? []).map((item: any) => ({
-      id: String(item?.stopId ?? item?.id ?? ''),
-      stopOrder: Number(item?.stopOrder ?? 0),
-      name: item?.stopName ?? item?.name ?? '',
-      zone: item?.zone ?? '',
-      active: item?.active !== false,
-      lat: item?.latitude != null ? Number(item.latitude) : undefined,
-      lng: item?.longitude != null ? Number(item.longitude) : undefined,
-    }));
-    return wrap(stops);
-  },
 
   updateDepartures: (id: string, body: UpdateTransportDeparturesBody) =>
     apiClient.patch(`/admin/transports/${id}/departures`, {

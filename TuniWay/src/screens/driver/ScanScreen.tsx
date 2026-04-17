@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -35,21 +34,12 @@ function pickActiveShift(shifts: EmployeeScheduleShiftDto[]) {
   return shifts.find((shift) => shift.status === 'IN_PROGRESS') ?? null;
 }
 
-interface ValidationFeedback {
-  success: boolean;
-  message: string;
-  status?: string;
-  validatedAt?: string | null;
-}
-
 export function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [loadingShift, setLoadingShift] = useState(true);
   const [activeShift, setActiveShift] = useState<EmployeeScheduleShiftDto | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
-  const [validating, setValidating] = useState(false);
-  const [validation, setValidation] = useState<ValidationFeedback | null>(null);
 
   const parsedTicket = useMemo(
     () => (scannedValue ? parseTicketQrPayload(scannedValue) : null),
@@ -77,52 +67,8 @@ export function ScanScreen() {
   );
 
   const handleScan = useCallback((result: BarcodeScanningResult) => {
-    const rawValue = result.data;
-    setScannedValue(rawValue);
-
-    const parsed = parseTicketQrPayload(rawValue);
-    if (!parsed) {
-      setValidation({
-        success: false,
-        message: 'Le QR a ete lu, mais son format billet est invalide.',
-      });
-      return;
-    }
-
-    if (!activeShift?.shiftId) {
-      setValidation({
-        success: false,
-        message: 'Aucun service actif: impossible de valider ce billet.',
-      });
-      return;
-    }
-
-    setValidating(true);
-    setValidation(null);
-    employeeApi.validateTicket({
-      shiftId: activeShift.shiftId,
-      ticketId: parsed.ticketId,
-      qrCode: parsed.token,
-      payloadVersion: parsed.v,
-    })
-      .then((res) => {
-        setValidation({
-          success: res.data.data.success,
-          message: res.data.data.message,
-          status: res.data.data.status,
-          validatedAt: res.data.data.validatedAt,
-        });
-      })
-      .catch((err) => {
-        setValidation({
-          success: false,
-          message: parseApiError(err).message,
-        });
-      })
-      .finally(() => {
-        setValidating(false);
-      });
-  }, [activeShift?.shiftId]);
+    setScannedValue(result.data);
+  }, []);
 
   const isMatchingTransport = parsedTicket && activeShift?.transportName
     ? parsedTicket.transportName.trim().toLowerCase() === activeShift.transportName.trim().toLowerCase()
@@ -159,142 +105,111 @@ export function ScanScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={s.header}>
-          <Text style={s.title}>Scanner QR</Text>
-          <Text style={s.subtitle}>Lecture locale du QR et affichage du billet scanne pour controle visuel.</Text>
+      <View style={s.header}>
+        <Text style={s.title}>Scanner QR</Text>
+        <Text style={s.subtitle}>Lecture locale du QR et affichage du billet scanne pour controle visuel.</Text>
+      </View>
+
+      <View style={s.cameraWrap}>
+        <CameraView
+          style={s.camera}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={scannedValue ? undefined : handleScan}
+        />
+        <View pointerEvents="none" style={s.overlay}>
+          <View style={s.targetFrame} />
+          <Text style={s.overlayText}>Cadrez le QR du billet dans le rectangle</Text>
         </View>
+      </View>
 
-        <View style={s.cameraWrap}>
-          <CameraView
-            style={s.camera}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={scannedValue ? undefined : handleScan}
-          />
-          <View pointerEvents="none" style={s.overlay}>
-            <View style={s.targetFrame} />
-            <Text style={s.overlayText}>Cadrez le QR du billet dans le rectangle</Text>
-          </View>
-        </View>
-
-        <View style={s.panel}>
-          <View style={s.panelHeader}>
-            <Text style={s.panelTitle}>Contexte du service</Text>
-            <TouchableOpacity style={s.reloadBtn} onPress={loadShiftContext} activeOpacity={0.88}>
-              <AppIcon family="Feather" name="refresh-cw" size={14} color={colors.navy} />
-            </TouchableOpacity>
-          </View>
-
-          {loadingShift ? (
-            <ActivityIndicator color={colors.amber} />
-          ) : scanError ? (
-            <Text style={s.errorText}>{scanError}</Text>
-          ) : activeShift ? (
-            <>
-              <Text style={s.serviceName}>{activeShift.transportName ?? 'Service actif'}</Text>
-              <Text style={s.serviceMeta}>
-                {activeShift.transportType ?? 'Transport'} • {activeShift.transportZone ?? 'Zone -'}
-              </Text>
-              <Text style={s.serviceMeta}>Demarre le {activeShift.actualStart ? formatDateTime(activeShift.actualStart) : '--'}</Text>
-            </>
-          ) : (
-            <Text style={s.helperText}>Aucun service en cours. Le scanner fonctionne quand meme, mais il ne peut pas comparer le billet a une ligne active.</Text>
-          )}
-        </View>
-
-        <View style={s.panel}>
-          <Text style={s.panelTitle}>Resultat du scan</Text>
-          {!scannedValue ? (
-            <Text style={s.helperText}>Aucun QR scanne pour le moment.</Text>
-          ) : validating ? (
-            <View style={s.validationRow}>
-              <ActivityIndicator color={colors.amber} />
-              <Text style={s.helperText}>Validation du billet en cours...</Text>
-            </View>
-          ) : parsedTicket ? (
-            <>
-              {!!validation && (
-                <View style={[
-                  s.resultBadge,
-                  validation.success ? s.resultBadgeOk : s.resultBadgeWarn,
-                ]}>
-                  <Text style={s.resultBadgeText}>
-                    {validation.message}
-                    {validation.status ? ` (${validation.status})` : ''}
-                  </Text>
-                </View>
-              )}
-              <View style={[s.resultBadge, isMatchingTransport === true && s.resultBadgeOk, isMatchingTransport === false && s.resultBadgeWarn]}>
-                <Text style={s.resultBadgeText}>
-                  {isMatchingTransport === true
-                    ? 'Billet coherent avec le service actif'
-                    : isMatchingTransport === false
-                      ? 'Transport du billet different du service actif'
-                      : 'Billet decode'}
-                </Text>
-              </View>
-              <View style={s.ticketGrid}>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Ticket ID</Text>
-                  <Text style={s.ticketValue}>{parsedTicket.ticketId}</Text>
-                </View>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Statut</Text>
-                  <Text style={s.ticketValue}>{parsedTicket.status}</Text>
-                </View>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Ligne</Text>
-                  <Text style={s.ticketValue}>{parsedTicket.transportName}</Text>
-                </View>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Trajet</Text>
-                  <Text style={s.ticketValue}>{parsedTicket.fromStop} vers {parsedTicket.toStop}</Text>
-                </View>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Achat</Text>
-                  <Text style={s.ticketValue}>{formatDateTime(parsedTicket.purchasedAt)}</Text>
-                </View>
-                <View style={s.ticketTile}>
-                  <Text style={s.ticketLabel}>Depart prevu</Text>
-                  <Text style={s.ticketValue}>{formatDateTime(parsedTicket.plannedDeparture)}</Text>
-                </View>
-              </View>
-              <Text style={s.noteText}>
-                Le scan est valide cote backend. Un billet ACTIVE passe en USED quand la verification reussit.
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={s.errorText}>Le QR a ete lu, mais son format ne correspond pas au payload billet actuel.</Text>
-              <Text style={s.rawText}>{scannedValue}</Text>
-            </>
-          )}
-
-          <TouchableOpacity
-            style={s.scanAgainBtn}
-            onPress={() => {
-              setScannedValue(null);
-              setValidation(null);
-            }}
-            activeOpacity={0.88}
-          >
-            <Text style={s.scanAgainText}>Scanner a nouveau</Text>
+      <View style={s.panel}>
+        <View style={s.panelHeader}>
+          <Text style={s.panelTitle}>Contexte du service</Text>
+          <TouchableOpacity style={s.reloadBtn} onPress={loadShiftContext} activeOpacity={0.88}>
+            <AppIcon family="Feather" name="refresh-cw" size={14} color={colors.navy} />
           </TouchableOpacity>
         </View>
-      </ScrollView>
+
+        {loadingShift ? (
+          <ActivityIndicator color={colors.amber} />
+        ) : scanError ? (
+          <Text style={s.errorText}>{scanError}</Text>
+        ) : activeShift ? (
+          <>
+            <Text style={s.serviceName}>{activeShift.transportName ?? 'Service actif'}</Text>
+            <Text style={s.serviceMeta}>
+              {activeShift.transportType ?? 'Transport'} • {activeShift.transportZone ?? 'Zone -'}
+            </Text>
+            <Text style={s.serviceMeta}>Demarre le {activeShift.actualStart ? formatDateTime(activeShift.actualStart) : '--'}</Text>
+          </>
+        ) : (
+          <Text style={s.helperText}>Aucun service en cours. Le scanner fonctionne quand meme, mais il ne peut pas comparer le billet a une ligne active.</Text>
+        )}
+      </View>
+
+      <View style={s.panel}>
+        <Text style={s.panelTitle}>Resultat du scan</Text>
+        {!scannedValue ? (
+          <Text style={s.helperText}>Aucun QR scanne pour le moment.</Text>
+        ) : parsedTicket ? (
+          <>
+            <View style={[s.resultBadge, isMatchingTransport === true && s.resultBadgeOk, isMatchingTransport === false && s.resultBadgeWarn]}>
+              <Text style={s.resultBadgeText}>
+                {isMatchingTransport === true
+                  ? 'Billet coherent avec le service actif'
+                  : isMatchingTransport === false
+                    ? 'Transport du billet different du service actif'
+                    : 'Billet decode'}
+              </Text>
+            </View>
+            <View style={s.ticketGrid}>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Ticket ID</Text>
+                <Text style={s.ticketValue}>{parsedTicket.ticketId}</Text>
+              </View>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Statut</Text>
+                <Text style={s.ticketValue}>{parsedTicket.status}</Text>
+              </View>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Ligne</Text>
+                <Text style={s.ticketValue}>{parsedTicket.transportName}</Text>
+              </View>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Trajet</Text>
+                <Text style={s.ticketValue}>{parsedTicket.fromStop} vers {parsedTicket.toStop}</Text>
+              </View>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Achat</Text>
+                <Text style={s.ticketValue}>{formatDateTime(parsedTicket.purchasedAt)}</Text>
+              </View>
+              <View style={s.ticketTile}>
+                <Text style={s.ticketLabel}>Depart prevu</Text>
+                <Text style={s.ticketValue}>{formatDateTime(parsedTicket.plannedDeparture)}</Text>
+              </View>
+            </View>
+            <Text style={s.noteText}>
+              Ce QR est decode localement depuis le format genere cote client. Aucun endpoint backend de validation/consommation de billet n existe encore dans le projet actuel.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={s.errorText}>Le QR a ete lu, mais son format ne correspond pas au payload billet actuel.</Text>
+            <Text style={s.rawText}>{scannedValue}</Text>
+          </>
+        )}
+
+        <TouchableOpacity style={s.scanAgainBtn} onPress={() => setScannedValue(null)} activeOpacity={0.88}>
+          <Text style={s.scanAgainText}>Scanner a nouveau</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.navy },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 14 },
   title: { fontSize: 22, fontWeight: '800', color: colors.white },
@@ -385,7 +300,6 @@ const s = StyleSheet.create({
   resultBadgeOk: { backgroundColor: colors.green },
   resultBadgeWarn: { backgroundColor: colors.red },
   resultBadgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
-  validationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   ticketGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   ticketTile: { width: '48%', backgroundColor: colors.bg, borderRadius: 12, padding: 10 },
   ticketLabel: { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 3 },
