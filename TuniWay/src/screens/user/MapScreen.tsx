@@ -687,6 +687,10 @@ export function MapScreen() {
             const typeColor = TYPE_COLOR[item.transport.type] ?? colors.muted;
             const typeIcon = TYPE_ICON[item.transport.type as keyof typeof TYPE_ICON] ?? 'bus';
 
+            const updatedAt = item.locationUpdatedAt ? new Date(item.locationUpdatedAt).getTime() : 0;
+            const diffMinutes = (Date.now() - updatedAt) / 60000;
+            const isLive = item.locationSource === 'LIVE' && diffMinutes < 3;
+
             return (
               <Marker
                 key={item.transport.id}
@@ -697,14 +701,17 @@ export function MapScreen() {
               >
                 <View style={[
                   mk.pin,
-                  { borderColor: typeColor, backgroundColor: isSelected ? typeColor : colors.white },
+                  { borderColor: typeColor, backgroundColor: isSelected ? typeColor : colors.white, opacity: isLive ? 1 : 0.65 },
                 ]}>
                   <AppIcon
                     family="MaterialCommunityIcons"
                     name={typeIcon}
-                    size={18}
+                    size={isLive ? 20 : 16}
                     color={isSelected ? colors.white : typeColor}
                   />
+                  {isLive && (
+                    <View style={[mk.liveIndicator, { backgroundColor: colors.green }]} />
+                  )}
                 </View>
               </Marker>
             );
@@ -795,6 +802,7 @@ export function MapScreen() {
 const mk = StyleSheet.create({
   pin: { width: 44, height: 44, borderRadius: 13, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
   stopDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.navy, borderWidth: 2.5, borderColor: colors.white },
+  liveIndicator: { position: 'absolute', top: -4, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.white },
 });
 
 const s = StyleSheet.create({

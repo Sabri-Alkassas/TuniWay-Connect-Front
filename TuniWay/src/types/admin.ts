@@ -4,16 +4,25 @@ export type ShiftStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED
 export type TransportType = 'BUS' | 'METRO' | 'TRAIN';
 
 
+export interface AdminActivityResponse {
+  id: string;
+  action: string;
+  detail: string;
+  time: string;
+  dot: string;
+}
+
 export interface AdminDashboardResponse {
-  totalStaff:        number;
-  activeStaff:       number;
-  employeeCount:     number;
-  adminCount:        number;
-  totalTransports:   number;
-  activeTransports:  number;
-  shiftsPending:     number;
-  shiftsActive:      number;
-  shiftsCompleted:   number;
+  totalStaff: number;
+  activeStaff: number;
+  employeeCount: number;
+  adminCount: number;
+  totalTransports: number;
+  activeTransports: number;
+  shiftsPending: number;
+  shiftsActive: number;
+  shiftsCompleted: number;
+  recentActivity?: AdminActivityResponse[];
 }
 
 
@@ -91,6 +100,15 @@ export interface TransportStopItem {
   active:     boolean;
   lat?:       number;
   lng?:       number;
+}
+
+export interface AdminStopResponse {
+  id: string;
+  name: string;
+  zone: string;
+  active: boolean;
+  lat?: number;
+  lng?: number;
 }
 
 export interface UpdateTransportStopsBody {

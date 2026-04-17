@@ -11,6 +11,7 @@ import type {
   UpdateTransportStopsBody,
   UpdateTransportDeparturesBody,
   UpdateTransportZoneBody,
+  AdminStopResponse,
   AdminShiftResponse,
   CreateShiftBody,
   UpdateShiftBody,
@@ -88,6 +89,29 @@ function normalizeShift(dto: any): AdminShiftResponse {
   };
 }
 
+function normalizeStop(dto: any): AdminStopResponse {
+  return {
+    id: String(dto?.stopId ?? dto?.id ?? ''),
+    name: dto?.stopName ?? dto?.name ?? '',
+    zone: dto?.zone ?? '',
+    active: dto?.active !== false,
+    lat: dto?.latitude != null ? Number(dto.latitude) : undefined,
+    lng: dto?.longitude != null ? Number(dto.longitude) : undefined,
+  };
+}
+
+function normalizeDeparture(dto: any) {
+  const id = dto?.id != null ? String(dto.id).trim() : '';
+  return {
+    id: id || undefined,
+    stopId: String(dto?.stopId ?? ''),
+    dayOfWeek: dto?.dayOfWeek ?? 'Monday',
+    time: dto?.departureTime ? String(dto.departureTime).slice(0, 5) : '06:00',
+    active: dto?.active !== false,
+    stopOrder: dto?.stopOrder != null ? Number(dto.stopOrder) : 0,
+  };
+}
+
 export const adminDashboardApi = {
   async get() {
     const { data } = await apiClient.get('/admin/dashboard');
@@ -101,6 +125,7 @@ export const adminDashboardApi = {
       shiftsPending: data?.scheduledShifts ?? 0,
       shiftsActive: data?.inProgressShifts ?? 0,
       shiftsCompleted: data?.completedShifts ?? 0,
+      recentActivity: data?.recentActivity ?? [],
     });
   },
 };
@@ -191,13 +216,33 @@ export const adminTransportApi = {
       stops: body.stops.map((stop) => ({
         stopId: stop.id,
         stopOrder: stop.stopOrder,
-        stopName: stop.name,
-        zone: stop.zone,
         active: stop.active,
-        latitude: stop.lat,
-        longitude: stop.lng,
       })),
     }),
+
+  async listStops() {
+    const { data } = await apiClient.get('/admin/stops');
+    return wrap((data ?? []).map(normalizeStop));
+  },
+
+  async getStops(id: string) {
+    const { data } = await apiClient.get(`/admin/transports/${id}/stops`);
+    const stops = (data?.stops ?? []).map((item: any) => ({
+      id: String(item?.stopId ?? item?.id ?? ''),
+      stopOrder: Number(item?.stopOrder ?? 0),
+      name: item?.stopName ?? item?.name ?? '',
+      zone: item?.zone ?? '',
+      active: item?.active !== false,
+      lat: item?.latitude != null ? Number(item.latitude) : undefined,
+      lng: item?.longitude != null ? Number(item.longitude) : undefined,
+    }));
+    return wrap(stops);
+  },
+
+  async getDepartures(id: string) {
+    const { data } = await apiClient.get(`/admin/transports/${id}/departures`);
+    return wrap((data?.departures ?? []).map(normalizeDeparture));
+  },
 
   updateDepartures: (id: string, body: UpdateTransportDeparturesBody) =>
     apiClient.patch(`/admin/transports/${id}/departures`, {
