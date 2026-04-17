@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { employeeApi } from '../../api/employee';
@@ -25,6 +27,28 @@ import type {
 } from '../../types/employee';
 
 const LOCATION_SYNC_INTERVAL_MS = 30000;
+const BACKGROUND_LOCATION_TASK = 'BACKGROUND_LOCATION_TASK';
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('[TaskManager] error:', error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    const latest = locations[locations.length - 1];
+    if (latest) {
+      try {
+        const shiftId = await AsyncStorage.getItem('activeTrackingShiftId');
+        if (shiftId) {
+          await employeeApi.updateLocation(shiftId, latest.coords.latitude, latest.coords.longitude);
+        }
+      } catch (err) {
+        // Non-blocking catch
+      }
+    }
+  }
+});
 
 function formatDateTime(value: string | null) {
   if (!value) return '--';
@@ -202,10 +226,12 @@ export function DriverHomeScreen() {
   const syncCurrentLocation = useCallback(async (shiftId: string, options?: { silent?: boolean }) => {
     if (!options?.silent) setSyncingLocation(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
+      const fgPerm = await Location.requestForegroundPermissionsAsync();
+      if (fgPerm.status !== 'granted') {
         throw new Error('L autorisation de localisation est necessaire pour envoyer la position.');
       }
+
+      await Location.requestBackgroundPermissionsAsync(); // best effort
 
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const res = await employeeApi.updateLocation(
@@ -218,22 +244,58 @@ export function DriverHomeScreen() {
       );
       const progressRes = await employeeApi.getProgress(shiftId);
       setProgress(progressRes.data.data);
-    } catch (err) {
-      setLocationNote(parseApiError(err).message);
+    } catch (err: any) {
+      setLocationNote(err.message || parseApiError(err).message);
     } finally {
       if (!options?.silent) setSyncingLocation(false);
     }
   }, []);
 
+  const enableBackgroundTracking = useCallback(async (shiftId: string) => {
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    if (!hasStarted) {
+      const bgPerm = await Location.requestBackgroundPermissionsAsync();
+      if (bgPerm.status === 'granted') {
+        await AsyncStorage.setItem('activeTrackingShiftId', shiftId);
+        await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: LOCATION_SYNC_INTERVAL_MS,
+          distanceInterval: 50,
+          deferredUpdatesInterval: LOCATION_SYNC_INTERVAL_MS,
+          showsBackgroundLocationIndicator: true,
+          foregroundService: {
+            notificationTitle: 'TuniWay Driver',
+            notificationBody: 'Partage de votre position en direct',
+          },
+        });
+      }
+    }
+  }, []);
+
+  const disableBackgroundTracking = useCallback(async () => {
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    if (hasStarted) {
+      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    }
+    await AsyncStorage.removeItem('activeTrackingShiftId');
+  }, []);
+
   useEffect(() => {
-    if (!selectedShift || selectedShift.status !== 'IN_PROGRESS') return;
+    if (!selectedShift || selectedShift.status !== 'IN_PROGRESS') {
+      disableBackgroundTracking();
+      return;
+    }
+
+    enableBackgroundTracking(selectedShift.shiftId);
 
     const intervalId = setInterval(() => {
       syncCurrentLocation(selectedShift.shiftId, { silent: true }).catch(() => undefined);
     }, LOCATION_SYNC_INTERVAL_MS);
 
-    return () => clearInterval(intervalId);
-  }, [selectedShift, syncCurrentLocation]);
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [selectedShift, syncCurrentLocation, enableBackgroundTracking, disableBackgroundTracking]);
 
   const handleShiftAction = useCallback(async (kind: 'start' | 'end') => {
     if (!selectedShift) return;

@@ -8,6 +8,7 @@ import type {
   EmployeeShiftStopDto,
   EmployeeShiftStopsResponse,
   EmployeeStopActionResponse,
+  EmployeeTicketValidationResponse,
   ShiftEndResponse,
   ShiftStartResponse,
 } from '../types/employee';
@@ -116,6 +117,18 @@ export const employeeApi = {
       latitude: normalizeCoordinate(data?.latitude) ?? latitude,
       longitude: normalizeCoordinate(data?.longitude) ?? longitude,
       updatedAt: normalizeIso(data?.updatedAt),
+    });
+  },
+
+  async validateTicket(payload: { shiftId?: string; ticketId: string; qrCode: string; payloadVersion?: number }): WrappedResponse<EmployeeTicketValidationResponse> {
+    const { data } = await apiClient.post('/employee/tickets/validate', payload);
+    return wrapData({
+      success: Boolean(data?.success),
+      message: data?.message ?? '',
+      shiftId: data?.shiftId != null ? String(data.shiftId) : payload.shiftId,
+      ticketId: data?.ticketId != null ? String(data.ticketId) : payload.ticketId,
+      status: data?.status != null ? String(data.status) : undefined,
+      validatedAt: normalizeIso(data?.validatedAt),
     });
   },
 

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { adminPlanningApi, adminShiftApi, adminStaffApi, adminTransportApi } from '../../api/admin';
 import { AppIcon } from '../../components/AppIcon';
+import { DateTimePickerInput } from '../../components/DateTimePickerInput';
 import { colors } from '../../theme/colors';
 import type {
   AdminShiftResponse,
@@ -184,30 +185,21 @@ function CreateShiftModal({ visible, onClose, onCreated }: {
               />
               {!!errors.transportId && <Text style={fStyles.error}>{errors.transportId.message}</Text>}
 
-              <Text style={fStyles.label}>Heure de debut</Text>
               <Controller
                 control={control}
                 name="startTime"
-                render={({ field: { value, onChange, onBlur } }) => (
-                  <View style={{ marginBottom: 14 }}>
-                    <TextInput style={[fStyles.input, !!errors.startTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-14T06:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
-                    {!!errors.startTime && <Text style={fStyles.error}>{errors.startTime.message}</Text>}
-                  </View>
+                render={({ field: { value, onChange } }) => (
+                  <DateTimePickerInput label="Heure de debut" value={value} onChange={onChange} error={errors.startTime?.message} />
                 )}
               />
 
-              <Text style={fStyles.label}>Heure de fin</Text>
               <Controller
                 control={control}
                 name="endTime"
-                render={({ field: { value, onChange, onBlur } }) => (
-                  <View style={{ marginBottom: 14 }}>
-                    <TextInput style={[fStyles.input, !!errors.endTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-14T14:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
-                    {!!errors.endTime && <Text style={fStyles.error}>{errors.endTime.message}</Text>}
-                  </View>
+                render={({ field: { value, onChange } }) => (
+                  <DateTimePickerInput label="Heure de fin" value={value} onChange={onChange} error={errors.endTime?.message} />
                 )}
               />
-              <View style={mStyles.hint}><Text style={mStyles.hintTxt}>Format : AAAA-MM-JJTHH:mm</Text></View>
             </>
           )}
         </ScrollView>
@@ -273,30 +265,21 @@ function EditShiftModal({ visible, shift, onClose, onSaved }: {
             </View>
           )}
 
-          <Text style={fStyles.label}>Heure de debut</Text>
           <Controller
             control={control}
             name="startTime"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={{ marginBottom: 14 }}>
-                <TextInput style={[fStyles.input, !!errors.startTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-11T06:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
-                {!!errors.startTime && <Text style={fStyles.error}>{errors.startTime.message}</Text>}
-              </View>
+            render={({ field: { value, onChange } }) => (
+              <DateTimePickerInput label="Heure de debut" value={value} onChange={onChange} error={errors.startTime?.message} />
             )}
           />
 
-          <Text style={fStyles.label}>Heure de fin</Text>
           <Controller
             control={control}
             name="endTime"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={{ marginBottom: 14 }}>
-                <TextInput style={[fStyles.input, !!errors.endTime && fStyles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} placeholder="2026-04-11T14:00" placeholderTextColor={colors.muted} autoCapitalize="none" />
-                {!!errors.endTime && <Text style={fStyles.error}>{errors.endTime.message}</Text>}
-              </View>
+            render={({ field: { value, onChange } }) => (
+              <DateTimePickerInput label="Heure de fin" value={value} onChange={onChange} error={errors.endTime?.message} />
             )}
           />
-          <View style={mStyles.hint}><Text style={mStyles.hintTxt}>Format : AAAA-MM-JJTHH:mm</Text></View>
         </ScrollView>
       </SafeAreaView>
     </Modal>

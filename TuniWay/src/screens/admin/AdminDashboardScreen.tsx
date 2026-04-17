@@ -24,12 +24,6 @@ const FALLBACK: AdminDashboardResponse = {
   shiftsCompleted: 87,
 };
 
-const RECENT_ACTIVITY = [
-  { id: '1', action: 'Compte agent cree', detail: 'Karim Ben Ali - EMPLOYE', time: 'il y a 2 min', dot: colors.green },
-  { id: '2', action: 'Transport mis a jour', detail: 'Ligne 5 - arrets de la zone A modifies', time: 'il y a 18 min', dot: colors.blue },
-  { id: '3', action: 'Service reattribue', detail: 'Bus #12 vers Chauffeur Mejri', time: 'il y a 1 h', dot: colors.amber },
-  { id: '4', action: 'Planning publie', detail: '3 services pour demain', time: 'il y a 2 h', dot: colors.red },
-];
 
 type QuickAction = {
   key: 'addStaff' | 'newTransport' | 'planShifts' | 'publishPlan';
@@ -270,7 +264,8 @@ export function AdminDashboardScreen() {
                 <Text style={styles.secLink}>Tout voir</Text>
               </TouchableOpacity>
             </View>
-            {RECENT_ACTIVITY.map((item) => (
+            {stats.recentActivity && stats.recentActivity.length > 0 ? (
+              stats.recentActivity.map((item) => (
               <View key={item.id} style={styles.actRow}>
                 <View style={[styles.actDot, { backgroundColor: item.dot }]} />
                 <View style={styles.actBody}>
@@ -279,7 +274,10 @@ export function AdminDashboardScreen() {
                 </View>
                 <Text style={styles.actTime}>{item.time}</Text>
               </View>
-            ))}
+            ))
+            ) : (
+              <Text style={styles.actEmpty}>Aucune activité récente</Text>
+            )}
 
             <Text style={styles.sectionTitle}>Actions rapides</Text>
             <View style={styles.qaGrid}>
@@ -351,6 +349,7 @@ const styles = StyleSheet.create({
   actAction: { fontSize: 12, fontWeight: '700', color: colors.navy },
   actDetail: { fontSize: 11, color: colors.muted, marginTop: 2 },
   actTime: { fontSize: 10, fontWeight: '700', color: colors.muted },
+  actEmpty: { fontSize: 13, color: colors.muted, textAlign: 'center', paddingVertical: 20 },
   qaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   qaCard: { width: '47%', backgroundColor: colors.white, borderRadius: 16, padding: 13, gap: 7, borderWidth: 1.5, borderColor: colors.border },
   qaIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
